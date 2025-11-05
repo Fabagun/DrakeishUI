@@ -202,6 +202,9 @@ local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
 eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:RegisterEvent("UPDATE_BINDINGS")
+eventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 
 -- Timer function for WoTLK compatibility
 local function CreateTimer(delay, callback)
@@ -235,21 +238,51 @@ eventFrame:SetScript("OnEvent", function(self, event, addonName)
     elseif event == "UPDATE_BINDINGS" then
         -- Ensure action bars stay visible after binding updates
         ShowAllActionBars()
+    elseif event == "ZONE_CHANGED_NEW_AREA" then
+        -- Set flag to prevent bars from hiding during zone transition
+        zoneChanging = true
+        -- Show action bars immediately when entering a new zone (including dungeons)
+        ShowAllActionBars()
+        -- Also show again after a tiny delay as backup in case something hides them
+        CreateTimer(0.1, function()
+            ShowAllActionBars()
+            -- Reset flag after transition
+            CreateTimer(1, function()
+                zoneChanging = false
+            end)
+        end)
+    elseif event == "PLAYER_ENTERING_WORLD" then
+        -- Set flag to prevent bars from hiding during world entry
+        zoneChanging = true
+        -- Show action bars immediately when entering the world (after loading screen)
+        ShowAllActionBars()
+        -- Also show again after a tiny delay as backup in case something hides them
+        CreateTimer(0.1, function()
+            ShowAllActionBars()
+            -- Reset flag after transition
+            CreateTimer(1, function()
+                zoneChanging = false
+            end)
+        end)
+    elseif event == "PLAYER_REGEN_ENABLED" then
+        -- Show action bars when leaving combat (sometimes they hide during combat/zone changes)
+        ShowAllActionBars()
     end
 end)
 
--- Flag to track when Interface Options is closing
+-- Flags to track when Interface Options is closing or zone is changing
 local interfaceOptionsClosing = false
+local zoneChanging = false
 
--- Hook action bar Hide methods to prevent hiding when Interface Options closes
+-- Hook action bar Hide methods to prevent hiding when Interface Options closes or during zone changes
 local function HookActionBarHides()
     for _, barName in ipairs(actionBars) do
         local bar = _G[barName]
         if bar and bar.Hide then
             local originalHide = bar.Hide
             bar.Hide = function(self)
-                -- If Interface Options is closing, prevent hiding the bar
-                if interfaceOptionsClosing then
+                -- If Interface Options is closing or zone is changing, prevent hiding the bar
+                if interfaceOptionsClosing or zoneChanging then
                     return
                 end
                 -- Otherwise, allow normal hiding
