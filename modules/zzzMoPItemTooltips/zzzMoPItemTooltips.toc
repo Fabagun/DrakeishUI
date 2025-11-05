@@ -1,0 +1,9 @@
+## Interface: 30300
+## Title: MoP Item Tooltips
+## Author: ZEUStiger
+## Notes: Changes item tooltips presentation to be similar to Mists of Pandaria ones.
+## Version: 1.1
+## SavedVariables: MoPItemTooltipEnabled, MoPItemTooltipColor, MoPItemTooltipEnchantColor, MoPItemTooltipSocketColor, MoPItemTooltipSeparators, MoPItemTooltipItemLevel, MoPItemTooltipFaction
+
+embeds.xml
+Core.lua

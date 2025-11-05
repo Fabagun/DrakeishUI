@@ -1,0 +1,14 @@
+## Interface: 30300
+## Title: |cfffff0f5DrakeishUI|r
+## Notes: |cffcaf7fa Dragonflight style UI addon based on many other great addons!!!|r
+## Version: 1.0.0
+## Author: F@bagun
+## Credits: DragonflightUI: Yuritsuki | Combuctor: Tuller | Loss of Control Alerts: RomanSpector & Blizzard | Cromulent: phyber (Cartographer_ZoneInfo: ckknight) | MoP Item Tooltips: ZEUStiger | Kui Nameplates: Kesava (backported by bkader) | LibStub: Kaelten, Cladhaire, ckknight, Mikk, Ammo, Nevcairiel | LibTourist-3.0: ckknight, Arrowmaster (credits: Abydos) | LibBabble-Zone-3.0: ckknight | UTF8: Pastamancer | pretty_actionbar: s0high |
+## SavedVariables: collapse_state, buffs_state, bags_state,quest_state, chat_state, party_state, caps_state, stance_state, bottombars_state, sidebars_state, hide_toggle_buttons, unitframes_state, gryphon_style_state
+
+DrakeishUI.xml
+
+
+
+
+

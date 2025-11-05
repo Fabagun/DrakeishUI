@@ -1,0 +1,28 @@
+# OS Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor Files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+*.sublime-*
+
+# Temporary Files
+*.tmp
+*.bak
+*.log
+
+# WoW Cache/WTF (don't commit user settings)
+# Uncomment if you want to exclude these:
+# WTF/
+# Cache/
+# Logs/
+
+# Backup files
+*.old
+*.orig
+

@@ -1,0 +1,25 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+	<Script file="config.lua"/>
+	<Include file="utils\utils.xml"/>
+	<Include file="modules\modules.xml"/>
+	
+	<!-- Custom initialization message -->
+	<Script>
+		local function ShowDrakeishUIMessage()
+			-- Color codes: Blizzard yellow, light blue, white
+			local message = "~|cffffd700DrakeishUI|r |cffff8000by F@bagun|r: |cffffffffLoaded|r~"
+			DEFAULT_CHAT_FRAME:AddMessage(message)
+		end
+		
+		-- Show message only once on PLAYER_LOGIN
+		local frame = CreateFrame("Frame")
+		frame:RegisterEvent("PLAYER_LOGIN")
+		frame:SetScript("OnEvent", function(self, event)
+			if event == "PLAYER_LOGIN" then
+				ShowDrakeishUIMessage()
+				-- Unregister the event so it only shows once
+				self:UnregisterEvent("PLAYER_LOGIN")
+			end
+		end)
+	</Script>
+</Ui>

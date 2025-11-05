@@ -1,0 +1,81 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+	<Script file="noop.lua"/>
+	<Script file="mainbars.lua"/>
+	<Script file="buttons.lua"/>
+	<Script file="stance.lua"/>
+	<Script file="vehicle.lua"/>
+	<Script file="multicast.lua"/>
+	<Script file="cooldowns.lua"/>
+	<Script file="sidebars.lua"/>
+	<Script file="grid.lua"/>
+    <Script file="watchframe.lua"/>
+	<Script file="minimap.lua"/>
+	<Script file="chat.lua"/>
+	<Script file="chatcopy.lua"/>
+	<Script file="minimapbuttons.lua"/>
+	<Script file="buffs.lua"/>
+	<Script file="micromenu.lua"/>
+	<Script file="id.lua"/>
+	<Script file="bottombarstoggle.lua"/>
+	<Script file="petbar.lua"/>
+	<Script file="UItoggles.lua"/>
+	<Include file="SetXpBar.xml"/>
+	<Script file="SetXpBar.lua"/>
+	<Include file="Combuctor\Combuctor\embeds.xml"/>
+    <Include file="Combuctor\Combuctor\load.xml"/>
+    <Script file="Combuctor\Combuctor_Sets\sets.lua"/>
+	<Script file="DragonflightUI\Libs\LibStub\LibStub.lua"/>
+    <Include file="DragonflightUI\Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml"/>
+	<Include file="DragonflightUI\Libs\AceAddon-3.0\AceAddon-3.0.xml"/>
+	<Include file="DragonflightUI\Libs\AceEvent-3.0\AceEvent-3.0.xml"/>
+	<Include file="DragonflightUI\Libs\AceDB-3.0\AceDB-3.0.xml"/>
+	<Include file="DragonflightUI\Libs\AceDBOptions-3.0\AceDBOptions-3.0.xml"/>
+	<Include file="DragonflightUI\Libs\AceConsole-3.0\AceConsole-3.0.xml"/>
+	<Include file="DragonflightUI\Libs\AceGUI-3.0\AceGUI-3.0.xml"/>
+	<Include file="DragonflightUI\Libs\AceConfig-3.0\AceConfig-3.0.xml"/>
+	<Script file="DragonflightUI\Core.lua"/>
+	<Script file="DragonflightUI\Modules\Castbar.lua"/>
+	<Script file="DragonflightUI\Modules\Unitframe.lua"/>
+	<Script file="DragonflightUI\Modules\partyframes.lua"/>
+	<Include file="Kui_Nameplates\Embeds.xml"/>
+	<Include file="Kui_Nameplates\Locales.xml"/>
+	<Include file="Kui_Nameplates\Core.xml"/>
+	<Include file="Kui_Nameplates\Modules.xml"/>
+	<Script file="buttonsrange.lua"/>
+	<Script file="DragonflightUI\Modules\petglow.lua"/>
+	<Script file="DragonflightUI\Modules\partyglow.lua"/>
+	<Include file="Bindings.xml"/>
+	<Script file="BlizzMove.lua"/>
+	<Include file="zzzMoPItemTooltips\embeds.xml"/>
+	<Script file="zzzMoPItemTooltips\Core.lua"/>
+	<Include file="LossOfControl\LossOfControl.xml"/>
+	<Include file="Cromulent\embeds.xml"/>
+	<Include file="Cromulent\Locales\locales.xml"/>
+	<Script file="Cromulent\Cromulent.lua"/>
+	<Script file="interface.lua"/>
+	<Script file="durability.lua"/>
+</Ui>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
