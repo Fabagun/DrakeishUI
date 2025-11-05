@@ -42,11 +42,66 @@ DrakeishUI is a Dragonflight-style UI addon for World of Warcraft: Wrath of the 
 
 ## Configuration
 
+### In-Game Settings
+
 The addon saves various UI states and settings. You can customize:
 - Collapsible UI elements (buffs, bags, quest tracker, chat, party frames, etc.)
 - Action bar visibility and positioning
 - Unit frame styles and positions
 - And much more!
+
+### Supplementary Configuration Files
+
+For advanced customization, you can modify the `config.lua` file in the root directory. This file contains detailed settings for:
+
+- **Action Bars**: Scale settings for main bars, sidebars, and vehicle bar
+- **Micromenu**: Scale and position settings for the micromenu and bags bar
+- **Experience/Reputation Bars**: Offset configurations for XP and reputation bars
+- **Style Options**: Choose between 'old' and 'new' styles for gryphons, XP bars, and bags
+- **Button Customization**: 
+  - Hotkey display and font settings
+  - Macro text appearance
+  - Cooldown text display
+  - Button count positioning
+  - Range indicator options
+- **Additional Bars**: Settings for pet bar, stance bar, and vehicle bar positioning
+- **Assets**: Paths to custom textures and icons
+
+**Example from `config.lua`:**
+```lua
+mainbars = {
+    scale_actionbar = 0.9,  -- Main action bar scale
+    scale_rightbar = 0.9,    -- Right sidebar scale
+    scale_leftbar = 0.9,     -- Left sidebar scale
+},
+```
+
+### Module Activation/Deactivation
+
+You can enable or disable specific modules by editing `modules/modules.xml`. Simply comment out (or remove) the lines for modules you don't want to use.
+
+**To disable a module:**
+- Comment out the line with `<!--` and `-->`
+
+**Example - Disabling the Grid overlay:**
+```xml
+<!-- <Script file="grid.lua"/> -->
+```
+
+**Available modules you can enable/disable:**
+- Action bars (mainbars, sidebars, petbar, stance, vehicle)
+- Cooldowns display
+- Chat enhancements
+- Minimap modifications
+- Buff/debuff display
+- DragonflightUI modules (unit frames, castbar, party frames)
+- Kui Nameplates
+- Combuctor bag system
+- Loss of Control alerts
+- Tooltips enhancements
+- And more...
+
+**Note:** Some modules have dependencies on others (especially libraries). Disable modules carefully to avoid errors.
 
 ## Version
 
