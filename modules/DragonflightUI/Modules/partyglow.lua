@@ -124,34 +124,11 @@ frame:RegisterEvent("UNIT_POWER_UPDATE")
 frame:RegisterEvent("UNIT_THREAT_SITUATION_UPDATE")
 frame:RegisterEvent("PLAYER_ENTERING_WORLD")
 
-frame:SetScript("OnEvent", function(self, event, ...)
-    if not ENABLE_PARTY_GLOWS then return end
-    
-    local arg1 = ...
-    
-    -- Update all party frames when group changes
-    if (event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ENTERING_WORLD") and party_state ~= 1 then
-        for i = 1, 4 do
-            local partyFrame = _G["CustomPartyFrame" .. i]
-            if partyFrame then
-                UpdatePartyCombatStatus(partyFrame, "party" .. i)
-            end
-        end
-    end
-    
-    -- Update specific party frame when their status changes
-    if event == "UNIT_HEALTH" or event == "UNIT_POWER_UPDATE" or event == "UNIT_THREAT_SITUATION_UPDATE" then
-        if arg1 and string.match(arg1, "^party%d$") then
-            local partyFrame = _G["CustomPartyFrame" .. string.sub(arg1, 6)]
-            if partyFrame then
-                UpdatePartyCombatStatus(partyFrame, arg1)
-            end
-        end
-    end
-end)
-
 -- Hook into party frame updates
 local function HookPartyFrameUpdates()
+    -- Store UpdatePartyCombatStatus in a local variable to ensure closure access
+    local updateFunc = UpdatePartyCombatStatus
+    
     for i = 1, 4 do
         local partyFrame = _G["CustomPartyFrame" .. i]
         if partyFrame then
@@ -160,7 +137,7 @@ local function HookPartyFrameUpdates()
                 local originalUpdate = partyFrame.UpdatePartyFrame
                 partyFrame.UpdatePartyFrame = function(self, unit)
                     originalUpdate(self, unit)
-                    UpdatePartyCombatStatus(self, unit)
+                    updateFunc(self, unit)
                 end
             end
         end
@@ -171,22 +148,30 @@ end
 local function InitializePartyGlows()
     if not ENABLE_PARTY_GLOWS then return end
     
-    -- Wait for party frames to be created
-    C_Timer.After(1, function()
+    -- Store UpdatePartyCombatStatus in a local variable to ensure closure access
+    local updateFunc = UpdatePartyCombatStatus
+    
+    -- Wait for party frames to be created (WoTLK-compatible timer)
+    local delayFrame = CreateFrame("Frame")
+    local elapsed = 0
+    delayFrame:SetScript("OnUpdate", function(self, delta)
+        elapsed = elapsed + delta
+        if elapsed >= 1 then
+            self:SetScript("OnUpdate", nil)
         HookPartyFrameUpdates()
         
         -- Update all existing party frames
         for i = 1, 4 do
             local partyFrame = _G["CustomPartyFrame" .. i]
             if partyFrame then
-                UpdatePartyCombatStatus(partyFrame, "party" .. i)
+                    updateFunc(partyFrame, "party" .. i)
+                end
             end
         end
     end)
 end
 
--- Initialize on login
-frame:RegisterEvent("PLAYER_LOGIN")
+-- Set up unified event handler
 frame:SetScript("OnEvent", function(self, event, ...)
     if event == "PLAYER_LOGIN" then
         InitializePartyGlows()

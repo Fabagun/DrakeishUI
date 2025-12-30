@@ -118,6 +118,8 @@ do
 	sidebarsToggleButton = CreateFrame('CheckButton', 'sidebarstoggle', UIParent)
 	sidebarsToggleButton:SetSize(16, 16)  -- Square size for better texture display
 	sidebarsToggleButton:SetPoint("RIGHT", MainMenuBar, "RIGHT", -231, -16)
+	sidebarsToggleButton:SetFrameStrata('TOOLTIP')
+	sidebarsToggleButton:SetFrameLevel(2000)
 	sidebarsToggleButton:SetAlpha(0.3)
 	sidebarsToggleButton:SetNormalTexture''
 	sidebarsToggleButton:SetPushedTexture''

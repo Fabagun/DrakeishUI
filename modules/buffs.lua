@@ -111,14 +111,25 @@ local function ShiftBuffsLeft()
         debuffYOffset = -(10 + (numRows * 50))
     end
 
+    -- Find the first visible buff/aura to align debuffs with
+    local firstAura = visibleAuras[1]
+    local debuffAnchor = BuffFrame
+    local debuffXOffset = OFFSET_X
+    
+    -- If we have visible auras, align debuffs with the first one
+    if firstAura then
+        debuffAnchor = firstAura
+        debuffXOffset = 0 -- Align directly with the first buff button
+    end
+
     -- Debuffs (max 16) - dynamic positioning to avoid overlap
     for i = 1, 16 do
         local debuff = _G["DebuffButton"..i]
         if debuff then
             debuff:ClearAllPoints()
             if i == 1 then
-                -- Position debuffs dynamically based on number of buff rows
-                debuff:SetPoint("TOPRIGHT", DebuffFrame, "TOPRIGHT", OFFSET_X-205, debuffYOffset)
+                -- Position first debuff to align with first buff button
+                debuff:SetPoint("TOPRIGHT", debuffAnchor, "TOPRIGHT", debuffXOffset, debuffYOffset)
             else
                 -- Anchor to left of previous debuff with Blizzard spacing (-5)
                 debuff:SetPoint("RIGHT", _G["DebuffButton"..(i - 1)], "LEFT", -5, 0)
@@ -383,7 +394,7 @@ do
 	
 	addon.package:RegisterEvents(function(self, event)
 		self:UnregisterEvent(event)
-		if not buffs_state then buffs_state = 0 end
+		if not buffs_state then buffs_state = 1 end  -- Default to visible (1) when no variables saved
 		if buffs_state == 1 then
 			BuffFrame:Show()
 			-- Show TemporaryEnchantFrame (let Blizzard manage individual TempEnchant buttons)

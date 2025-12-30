@@ -1616,8 +1616,22 @@ function Module.HookPlayerStatus()
             frame.PlayerFrameDeco:Show()
             frame.PlayerFrameBorder:SetVertexColor(1.0, 1.0, 1.0, 1.0)
 
-            frame.RestIcon:Show()
-            frame.RestIconAnimation:Play()
+            -- Hide RestIcon if player frame is hidden (MistrasDiabloOrbs active)
+            -- Check if MistrasDiabloOrbs is hiding the player frame
+            local playerFrameHidden = false
+            if D32CharacterData and D32CharacterData.defaultPlayerFrame and not D32CharacterData.defaultPlayerFrame.show then
+                playerFrameHidden = true
+            elseif PlayerFrame and not PlayerFrame:IsShown() then
+                playerFrameHidden = true
+            end
+            
+            if not playerFrameHidden then
+                frame.RestIcon:Show()
+                frame.RestIconAnimation:Play()
+            else
+                frame.RestIcon:Hide()
+                frame.RestIconAnimation:Stop()
+            end
 
             PlayerStatusTexture:SetTexCoord(Module.GetCoords('UI-HUD-UnitFrame-Player-PortraitOn-Status'))
             PlayerStatusTexture:Show()
@@ -1914,11 +1928,75 @@ function Module.ChangeTargetFrame()
     end
     
     -- Hook target frame buff updates to style buttons with border
+    -- Limit visibility to maximum 3 rows (18 buttons: 6 per row)
     hooksecurefunc("TargetFrame_UpdateAuras", function()
+        -- Reapply castbar position when buffs update (prevents Blizzard from repositioning it)
+        if TargetFrameSpellBar and TargetFrameSpellBar:IsShown() then
+            TargetFrameSpellBar:ClearAllPoints()
+            TargetFrameSpellBar:SetPoint('TOPLEFT', TargetFrame, 'BOTTOMLEFT', 25 - 20, 22)
+        end
+        
+        -- Reapply class colors when buffs update (prevents them from being overwritten)
+        if UnitExists('target') then
+            Module.ReApplyTargetFrame()
+        end
+        
+        local MAX_VISIBLE_AURAS = 18 -- 3 rows * 6 buttons per row
+        
+        -- Get the size from the first buff button to match debuff size
+        local firstBuff = _G["TargetFrameBuff1"]
+        local buffWidth, buffHeight
+        if firstBuff then
+            buffWidth = firstBuff:GetWidth()
+            buffHeight = firstBuff:GetHeight()
+        end
+        
+        -- Handle target buffs
         for i = 1, 32 do
             local buff = _G["TargetFrameBuff"..i]
             if buff then
                 StyleTargetAuraIcon(buff)
+                -- Move first buff button 25px down (others will follow since they're anchored to it)
+                if i == 1 and buff:IsShown() then
+                    local point, relativeTo, relativePoint, xOfs, yOfs = buff:GetPoint(1)
+                    if point and yOfs then
+                        buff:ClearAllPoints()
+                        buff:SetPoint(point, relativeTo, relativePoint, xOfs, yOfs - 25)
+                    end
+                end
+                -- Hide buffs beyond the maximum visible count
+                if i > MAX_VISIBLE_AURAS then
+                    buff:Hide()
+                end
+            end
+        end
+        -- Handle target debuffs
+        -- Find TargetFrameBuff13 to anchor the first debuff under it
+        local buff13 = _G["TargetFrameBuff13"]
+        local debuffAnchor = nil
+        if buff13 and buff13:IsShown() then
+            debuffAnchor = buff13
+        end
+        
+        for i = 1, 32 do
+            local debuff = _G["TargetFrameDebuff"..i]
+            if debuff then
+                -- Set debuff size to match buff size
+                if buffWidth and buffHeight then
+                    debuff:SetSize(buffWidth, buffHeight)
+                end
+                StyleTargetAuraIcon(debuff)
+                
+                -- Position first debuff directly under TargetFrameBuff13
+                if i == 1 and debuffAnchor then
+                    debuff:ClearAllPoints()
+                    debuff:SetPoint("TOPRIGHT", debuffAnchor, "BOTTOMRIGHT", 0, -6)
+                end
+                
+                -- Hide debuffs beyond the maximum visible count
+                if i > MAX_VISIBLE_AURAS then
+                    debuff:Hide()
+                end
             end
         end
     end)
@@ -2742,6 +2820,21 @@ function Module.HookRestFunctions()
             end
         end
     )
+    
+    -- Hook PlayerFrame Hide to also hide RestIcon when MistrasDiabloOrbs hides the player frame
+    if PlayerFrame then
+        local originalPlayerFrameHide = PlayerFrame.Hide
+        PlayerFrame.Hide = function(self, ...)
+            originalPlayerFrameHide(self, ...)
+            -- Hide RestIcon when player frame is hidden
+            if frame.RestIcon then
+                frame.RestIcon:Hide()
+                if frame.RestIconAnimation then
+                    frame.RestIconAnimation:Stop()
+                end
+            end
+        end
+    end
 end
 
 function frame:OnEvent(event, arg1)

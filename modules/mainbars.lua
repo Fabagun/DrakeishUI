@@ -322,6 +322,8 @@ do
 	capsToggleButton = CreateFrame('CheckButton', 'gryphontoggle', UIParent)
 	capsToggleButton:SetSize(16, 16)  -- Square size for better texture display
 	capsToggleButton:SetPoint("LEFT", MainMenuBar, "LEFT", 250, -16)
+	capsToggleButton:SetFrameStrata('TOOLTIP')
+	capsToggleButton:SetFrameLevel(2000)
 	capsToggleButton:SetAlpha(0.3)
 	capsToggleButton:SetNormalTexture''
 	capsToggleButton:SetPushedTexture''
@@ -347,20 +349,33 @@ do
 	
 	capsToggleButton:SetScript('OnClick',function(self)
 		local checked = self:GetChecked();
+		caps_state = checked and 1 or 0
+		
 		if checked then
 			normal:SetTexCoord(0, 0.5, 0, 1)  -- Left half (up arrow - caps are hidden)
 			pushed:SetTexCoord(0, 0.5, 0, 1)
 			highlight:SetTexCoord(0, 0.5, 0, 1)
-			MainMenuBarLeftEndCap:Show()
-		   MainMenuBarRightEndCap:Show()
 		else
 			normal:SetTexCoord(0.5, 1, 0, 1)  -- Right half (down arrow - caps are visible)
 			pushed:SetTexCoord(0.5, 1, 0, 1)
 			highlight:SetTexCoord(0.5, 1, 0, 1)
-			MainMenuBarLeftEndCap:Hide()
-		    MainMenuBarRightEndCap:Hide()
 		end
-		caps_state = checked and 1 or 0
+		
+		-- Apply gryphon style to handle both gryphons and angel/demon state
+		-- This ensures that when state is 4 (angel/demon), the artwork is shown/hidden correctly
+		if _G.ApplyGryphonStyle then
+			local style = _G.gryphon_style_state or gryphon_style_state or 1
+			_G.ApplyGryphonStyle(style)
+		else
+			-- Fallback to simple gryphon toggle if ApplyGryphonStyle is not available
+			if checked then
+				MainMenuBarLeftEndCap:Show()
+				MainMenuBarRightEndCap:Show()
+			else
+				MainMenuBarLeftEndCap:Hide()
+				MainMenuBarRightEndCap:Hide()
+			end
+		end
 		-- print("buffs_state saved as:", buffs_state) -- Debug line
 	end)
 	
@@ -374,21 +389,33 @@ do
 	
 	addon.package:RegisterEvents(function(self, event)
 		self:UnregisterEvent(event)
-		if not caps_state then caps_state = 0 end
+		if not caps_state then caps_state = 1 end  -- Default to visible (1) when no variables saved
 		if caps_state == 1 then
-			MainMenuBarLeftEndCap:Show()
-		    MainMenuBarRightEndCap:Show()
 			normal:SetTexCoord(0, 0.5, 0, 1)  -- Left half (up arrow - caps are hidden)
 			pushed:SetTexCoord(0, 0.5, 0, 1)
 			highlight:SetTexCoord(0, 0.5, 0, 1)
 			capsToggleButton:SetChecked(1)
 		else
-			MainMenuBarLeftEndCap:Hide()
-		    MainMenuBarRightEndCap:Hide()
 			normal:SetTexCoord(0.5, 1, 0, 1)  -- Right half (down arrow - caps are visible)
 			pushed:SetTexCoord(0.5, 1, 0, 1)
 			highlight:SetTexCoord(0.5, 1, 0, 1)
 			capsToggleButton:SetChecked(nil)
+		end
+		
+		-- Apply gryphon style to handle both gryphons and angel/demon state
+		-- This ensures that when state is 4 (angel/demon), the artwork is shown/hidden correctly
+		if _G.ApplyGryphonStyle then
+			local style = _G.gryphon_style_state or gryphon_style_state or 1
+			_G.ApplyGryphonStyle(style)
+		else
+			-- Fallback to simple gryphon toggle if ApplyGryphonStyle is not available
+			if caps_state == 1 then
+				MainMenuBarLeftEndCap:Show()
+				MainMenuBarRightEndCap:Show()
+			else
+				MainMenuBarLeftEndCap:Hide()
+				MainMenuBarRightEndCap:Hide()
+			end
 		end
 	end, 'PLAYER_LOGIN'
 	);
@@ -401,6 +428,8 @@ do
 	stanceToggleButton = CreateFrame('CheckButton', 'stancetoggle', UIParent)
 	stanceToggleButton:SetSize(16, 16)  -- Square size for better texture display
 	stanceToggleButton:SetPoint("LEFT", MainMenuBar, "LEFT", 230, -16)
+	stanceToggleButton:SetFrameStrata('TOOLTIP')
+	stanceToggleButton:SetFrameLevel(2000)
 	stanceToggleButton:SetAlpha(0.3)
 	stanceToggleButton:SetNormalTexture''
 	stanceToggleButton:SetPushedTexture''
@@ -490,7 +519,7 @@ do
 	
 	addon.package:RegisterEvents(function(self, event)
 		self:UnregisterEvent(event)
-		if not stance_state then stance_state = 0 end
+		if not stance_state then stance_state = 1 end  -- Default to visible (1) when no variables saved
 		if stance_state == 1 then
 			-- Bars are shown, show up arrow
 			stanceBarsManuallyHidden = false

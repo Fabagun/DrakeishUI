@@ -89,13 +89,6 @@ hooksecurefunc("PetFrame_Update", function()
     ConfigurePetThreatGlow()
 end)
 
--- Hook for pet combat state changes
-hooksecurefunc("PetFrame_UpdateCombat", function()
-    HideOriginalCombatTextures()
-    ConfigurePetAttackMode()
-    ConfigurePetThreatGlow()
-end)
-
 -- Hook PetAttackModeTexture Show to apply custom texture
 if PetAttackModeTexture then
     hooksecurefunc(PetAttackModeTexture, "Show", function()

@@ -2,6 +2,10 @@
 
 ![DrakeishUI](DrakeishUI.png)
 
+![DrakeishUI Screenshot 2](DrakeishUI_2.png)
+
+![DrakeishUI Screenshot 3](DrakeishUI_2a.png)
+
 ## Description
 
 DrakeishUI is a Dragonflight-style UI addon for World of Warcraft: Wrath of the Lich King (3.3.5). It provides a modern, clean interface that combines the best features from multiple great addons into one cohesive package.
@@ -19,6 +23,17 @@ DrakeishUI is a Dragonflight-style UI addon for World of Warcraft: Wrath of the 
 - **Loss of Control Alerts**: Visual alerts for crowd control effects
 
 ### Additional Features
+- **Mistra's Diablo Orbs**: Diablo-style health and mana orbs with customizable appearance
+  - Health orb (always red) and mana orb (class-colored)
+  - Pet orb with health display (positioned at bottom with main orbs)
+  - Customizable textures, colors, and animations
+  - Toggle pet orb visibility from UI settings
+- **Custom Diablo Target Frame**: Replaces default target frame when Diablo orbs are active
+  - Diablo-style textures and layout
+  - Health bar color options (class colors for players, red/green for NPCs, red for bosses)
+  - Classification indicators (boss, rare, elite)
+  - Tooltip support matching normal target frame
+  - No target castbar and no target buff/debuff frame in this mode(on purpose) to have more simple rpg feel
 - **Bag Management**: Combuctor bag system with filtering and organization
 - **Tooltips**: Enhanced item tooltips with additional information
 - **Zone Information**: Cromulent integration for zone details
@@ -103,6 +118,10 @@ You can enable or disable specific modules by editing `modules/modules.xml`. Sim
 
 **Note:** Some modules have dependencies on others (especially libraries). Disable modules carefully to avoid errors.
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a detailed list of recent changes and updates.
+
 ## Version
 
 **Current Version:** 1.0.0
@@ -120,6 +139,7 @@ This addon is built upon the work of many talented developers:
 - **Loss of Control Alerts**: RomanSpector & Blizzard
 - **Cromulent**: phyber (Cartographer_ZoneInfo: ckknight)
 - **MoP Item Tooltips**: ZEUStiger
+- **Mistra's Diablo Orbs**: John Rubin - "Mistra50" (originally from RothUI by "Zork")
 - **Kui Nameplates**: Kesava (backported by bkader)
 - **LibStub**: Kaelten, Cladhaire, ckknight, Mikk, Ammo, Nevcairiel
 - **LibTourist-3.0**: ckknight, Arrowmaster (credits: Abydos)

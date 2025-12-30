@@ -1,0 +1,90 @@
+﻿<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Script file="MD32MiniMapButton.lua" />
+	<Button name="D32MiniMapButton" parent="Minimap" movable="true" enableMouse="true" frameStrata="LOW">
+		<Size>
+			<AbsDimension x="33" y="33" />
+		</Size>
+		<Anchors>
+			<Anchor point="TOPLEFT">
+				<Offset x="0" y="0" />
+			</Anchor>
+		</Anchors>
+		<Scripts>
+			<OnLoad>
+				D32MiniMapButton:RegisterForDrag("LeftButton")
+				self:RegisterForClicks("LeftButtonUp","RightButtonUp")
+				self:SetScript("OnClick",function(_,arg1)
+					D32MiniMapButton_OnClick()
+				end)
+				D32MiniMapButtonPosition_LoadFromDefaults()
+			</OnLoad>
+			<OnDragStart>
+				D32MiniMapButton_DraggingFrame:Show()
+			</OnDragStart>
+			<OnDragStop>
+				D32MiniMapButton_DraggingFrame:Hide()
+			</OnDragStop>
+			<OnEnter>
+				D32MinimapButtonTooltip:ClearLines()
+				D32MinimapButtonTooltip:SetOwner(D32MiniMapButton,"CENTER")
+				D32MinimapButtonTooltip:AddLine("Mistra's Diablo Orbs")
+				D32MinimapButtonTooltip:AddLine("Left click to open the menu")
+				D32MinimapButtonTooltip:AddLine("Hold Shift and Drag on any orb to move it.")
+				D32MinimapButtonTooltip:Show()
+			</OnEnter>
+			<OnLeave>
+				D32MinimapButtonTooltip:Hide()
+			</OnLeave>
+		</Scripts>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="D32MiniMapButton_Icon" file="Interface\AddOns\DrakeishUI\modules\MistrasDiabloOrbs\images\orb_filling5.tga">
+					<Size>
+						<AbsDimension x="21" y="21" />
+					</Size>
+					<Anchors>
+						<Anchor point="TOPLEFT">
+							<Offset>
+								<AbsDimension x="7" y="-6" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+					<Color r="1" g="0" b="0" a="1"/>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture file="Interface\Minimap\MiniMap-TrackingBorder">
+					<Size>
+						<AbsDimension x="56" y="56" />
+					</Size>
+					<Anchors>
+						<Anchor point="TOPLEFT"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Frame name="D32MiniMapButton_DraggingFrame" hidden="true">
+				<Scripts>
+					<OnUpdate>
+						D32_Minimap_Update()
+					</OnUpdate>
+				</Scripts>
+			</Frame>
+			<GameTooltip name="D32MinimapButtonTooltip" inherits="GameTooltipTemplate">
+				<Layers>
+					<Layer>
+						<FontString font="Interface\addons\D3Orbs2\fonts\Of Wildflowers and Wings.ttf">
+							<FontHeight val="16"></FontHeight>
+						</FontString>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnLoad>
+					</OnLoad>
+				</Scripts>
+			</GameTooltip>
+		</Frames>
+		<HighlightTexture alphaMode="ADD" file="Interface\Minimap\UI-Minimap-ZoomButton-Highlight"/>
+	</Button>
+</Ui>

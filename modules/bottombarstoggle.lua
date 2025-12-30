@@ -12,6 +12,8 @@ do
 	toggleBars = CreateFrame('Button', 'bottombarstoggle', UIParent)
 	toggleBars:SetSize(16, 16)  -- Square size for better texture display
 	toggleBars:SetPoint("CENTER", pUiMainBar, "CENTER", 253, -44)
+	toggleBars:SetFrameStrata('TOOLTIP')
+	toggleBars:SetFrameLevel(2000)
 	toggleBars:SetAlpha(0.3)
 	toggleBars:EnableMouse(true)
 	toggleBars:RegisterForClicks('LeftButtonUp')
@@ -40,6 +42,33 @@ do
 		elseif barState == 3 then
 			-- Left bar hidden, right visible
 			toggleBars.texture:SetTexCoord(0.5, 1, 0, 1)  -- Right half (down arrow - still expanding)
+		end
+	end
+	
+	-- Hook the Show methods to prevent other modules from showing bars when our toggle is active
+	local function HookBottomBars()
+		if MultiBarBottomLeft then
+			local originalShow = MultiBarBottomLeft.Show
+			MultiBarBottomLeft.Show = function(self)
+				-- Block MultiBarBottomLeft from showing only in state 2
+				if barState == 2 then
+					return -- Don't show
+				else
+					originalShow(self)
+				end
+			end
+		end
+		
+		if MultiBarBottomRight then
+			local originalShow = MultiBarBottomRight.Show
+			MultiBarBottomRight.Show = function(self)
+				-- Block MultiBarBottomRight from showing in states 1, 2, and 3
+				if barState == 1 or barState == 2 or barState == 3 then
+					return -- Don't show
+				else
+					originalShow(self)
+				end
+			end
 		end
 	end
 	
@@ -127,33 +156,6 @@ do
 		HookBottomBars()
 	end, 'PLAYER_LOGIN'
 	);
-	
-	-- Hook the Show methods to prevent other modules from showing bars when our toggle is active
-	local function HookBottomBars()
-		if MultiBarBottomLeft then
-			local originalShow = MultiBarBottomLeft.Show
-			MultiBarBottomLeft.Show = function(self)
-				-- Block MultiBarBottomLeft from showing only in state 2
-				if barState == 2 then
-					return -- Don't show
-				else
-					originalShow(self)
-				end
-			end
-		end
-		
-		if MultiBarBottomRight then
-			local originalShow = MultiBarBottomRight.Show
-			MultiBarBottomRight.Show = function(self)
-				-- Block MultiBarBottomRight from showing in states 1, 2, and 3
-				if barState == 1 or barState == 2 or barState == 3 then
-					return -- Don't show
-				else
-					originalShow(self)
-				end
-			end
-		end
-	end
 	
 	-- Initialize the hooks
 	local hookFrame = CreateFrame("Frame")

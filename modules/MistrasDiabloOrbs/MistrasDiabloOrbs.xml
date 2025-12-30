@@ -1,0 +1,948 @@
+﻿<Ui xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="http://www.blizzard.com/wow/ui/">
+	<Script file="MistrasDiabloOrbs.lua" />
+	<Frame name="D32GUI" parent="UIParent" toplevel="true" movable="true">
+		<Size>
+			<AbsDimension x="375" y="450" />
+		</Size>
+		<Anchors>
+			<Anchor point="TOP">
+				<Offset x="0" y="0" />
+			</Anchor>
+		</Anchors>
+		<Backdrop bgFile="Interface\DialogFrame\UI-DialogBox-Background-Dark" edgeFile="Interface\DialogFrame\UI-DialogBox-Border" tile="true">
+			<BackgroundInsets>
+				<AbsInset left="11" right="12" top="12" bottom="11" />
+			</BackgroundInsets>
+			<TileSize>
+				<AbsValue val="32" />
+			</TileSize>
+			<EdgeSize>
+				<AbsValue val="32" />
+			</EdgeSize>
+			<Color r="0" g="0" b="0" />
+		</Backdrop>
+		<Layers>
+			<Layer level="OVERLAY">
+				<FontString name="FontString1" inherits="NumberFontNormalHuge" font="Interface\AddOns\DrakeishUI\modules\MistrasDiabloOrbs\fonts\Of Wildflowers and Wings.ttf" text="Mistra's Diablo Orbs" justifyV="TOP">
+					<Size>
+						<AbsDimension x="262" y="57" />
+					</Size>
+					<Anchors>
+						<Anchor point="CENTER">
+							<Offset x="0" y="181" />
+						</Anchor>
+					</Anchors>
+					<FontHeight>
+						<AbsValue val="42" />
+					</FontHeight>
+					<Color r="1" g="0" b="0" />
+				</FontString>
+				<FontString name="FontString1" font="Interface\AddOns\DrakeishUI\modules\MistrasDiabloOrbs\fonts\Of Wildflowers and Wings.ttf" text="Orb Configuration Utility" justifyV="TOP">
+					<Size>
+						<AbsDimension x="194" y="39" />
+					</Size>
+					<Anchors>
+						<Anchor point="CENTER">
+							<Offset x="0" y="150" />
+						</Anchor>
+					</Anchors>
+					<FontHeight>
+						<AbsValue val="22" />
+					</FontHeight>
+					<Color r="1" g="0.5" b="0.5" />
+				</FontString>
+				<FontString parentKey="text" name="$parentText" inherits="GameFontNormalSmall">
+					<Anchors>
+						<Anchor point="LEFT" relativePoint="RIGHT">
+							<Offset x="-317" y="209" />
+						</Anchor>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Button name="HealthOrbButton">
+				<Size>
+					<AbsDimension x="85" y="27" />
+				</Size>
+				<Anchors>
+					<Anchor point="CENTER">
+						<Offset x="-68" y="82" />
+					</Anchor>
+				</Anchors>
+				<Layers>
+					<Layer>
+						<FontString parentKey="text" inherits="BossEmoteNormalHuge" setAllPoints="true" font="Interface\AddOns\DrakeishUI\modules\MistrasDiabloOrbs\fonts\Of Wildflowers and Wings.ttf" text="Health Orb" justifyV="TOP">
+							<Anchors>
+								<Anchor point="CENTER">
+									<Offset x="0" y="0" />
+								</Anchor>
+							</Anchors>
+							<FontHeight>
+								<AbsValue val="22" />
+							</FontHeight>
+							<Color r="1" g="0.5" b="0.5" />
+						</FontString>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnLoad>
+						HealthOrbButton:RegisterForClicks("LeftButtonUp")
+						HealthOrbButton.defaultTextColor = {r=1, g=0.5, b=0.5, a = 1}
+					</OnLoad>
+					<OnEnter>
+						local r,g,b,a = HealthOrbButton.text:GetTextColor()
+						HealthOrbButton.text:SetTextColor(1,1,1,a)
+					</OnEnter>
+					<OnLeave>
+						local r,g,b,a = HealthOrbButton.defaultTextColor.r,HealthOrbButton.defaultTextColor.g,HealthOrbButton.defaultTextColor.b,HealthOrbButton.defaultTextColor.a
+						HealthOrbButton.text:SetTextColor(r,g,b,a)
+					</OnLeave>
+					<OnMouseDown>
+						local r,g,b,a = HealthOrbButton.text:GetTextColor()
+						HealthOrbButton.text:SetTextColor(r,g,b,a/2)
+					</OnMouseDown>
+					<OnMouseUp>
+						local r,g,b,a = HealthOrbButton.text:GetTextColor()
+						HealthOrbButton.text:SetTextColor(r,g,b,a*2)
+					</OnMouseUp>
+					<OnClick>
+						if D32ConfigFrame:IsVisible() then
+						if D32ConfigFrame.text:GetText() == HealthOrbButton.text:GetText() then
+						D32ConfigFrame:Hide()
+						HealthOrbOptionsDropDown:Hide()
+						else
+						CommitButton.orb = healthOrb
+						CommitButton.orbData = D32CharacterData.healthOrb
+						CommitButton.textureElement = D32CharacterData.healthOrb.textures
+						resetXMLTextBoxes()
+						checkXMLOrbFontPlacement()
+						UpdateXMLTextures(healthOrb)
+						UpdateXMLColors(D32CharacterData.healthOrb.orbColor,D32CharacterData.healthOrb.galaxy,D32CharacterData.healthOrb.font1,D32CharacterData.healthOrb.font2)
+						UpdateXMLText(healthOrb)
+						ManaOrbOptionsDropDown:Hide()
+						HealthOrbOptionsDropDown:Show()
+						D32ConfigFrame.text:SetText(HealthOrbButton.text:GetText())
+						D32ConfigFrame.text:SetTextColor(HealthOrbButton.defaultTextColor.r,HealthOrbButton.defaultTextColor.g,HealthOrbButton.defaultTextColor.b,HealthOrbButton.defaultTextColor.a)
+						end
+						else
+						CommitButton.orb = healthOrb
+						CommitButton.orbData = D32CharacterData.healthOrb
+						CommitButton.textureElement = D32CharacterData.healthOrb.textures
+						D32ConfigFrame:Show()
+						resetXMLTextBoxes()
+						checkXMLOrbFontPlacement()
+						UpdateXMLTextures(healthOrb)
+						UpdateXMLColors(D32CharacterData.healthOrb.orbColor,D32CharacterData.healthOrb.galaxy,D32CharacterData.healthOrb.font1,D32CharacterData.healthOrb.font2)
+						UpdateXMLText(healthOrb)
+						HealthOrbOptionsDropDown:Show()
+						D32ConfigFrame.text:SetText(HealthOrbButton.text:GetText())
+						D32ConfigFrame.text:SetTextColor(HealthOrbButton.defaultTextColor.r,HealthOrbButton.defaultTextColor.g,HealthOrbButton.defaultTextColor.b,HealthOrbButton.defaultTextColor.a)
+						end
+					</OnClick>
+				</Scripts>
+			</Button>
+			<Button name="ManaOrbButton">
+				<Size>
+					<AbsDimension x="85" y="27" />
+				</Size>
+				<Anchors>
+					<Anchor point="CENTER">
+						<Offset x="72" y="82" />
+					</Anchor>
+				</Anchors>
+				<Layers>
+					<Layer>
+						<FontString parentKey="text" inherits="BossEmoteNormalHuge" setAllPoints="true" font="Interface\AddOns\DrakeishUI\modules\MistrasDiabloOrbs\fonts\Of Wildflowers and Wings.ttf" text="Mana Orb" justifyV="TOP">
+							<Anchors>
+								<Anchor point="CENTER">
+									<Offset x="0" y="0" />
+								</Anchor>
+							</Anchors>
+							<FontHeight>
+								<AbsValue val="22" />
+							</FontHeight>
+							<Color r="0" g="1" b="1" />
+						</FontString>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnLoad>
+						ManaOrbButton:RegisterForClicks("LeftButtonUp")
+						ManaOrbButton.defaultTextColor = {r=0, g=1, b=1, a=1}
+					</OnLoad>
+					<OnEnter>
+						local r,g,b,a = ManaOrbButton.text:GetTextColor()
+						ManaOrbButton.text:SetTextColor(1,1,1,a)
+					</OnEnter>
+					<OnLeave>
+						local r,g,b,a = ManaOrbButton.defaultTextColor.r,ManaOrbButton.defaultTextColor.g,ManaOrbButton.defaultTextColor.b,ManaOrbButton.defaultTextColor.a
+						ManaOrbButton.text:SetTextColor(r,g,b,a)
+					</OnLeave>
+					<OnMouseDown>
+						local r,g,b,a = ManaOrbButton.text:GetTextColor()
+						ManaOrbButton.text:SetTextColor(r,g,b,a/2)
+					</OnMouseDown>
+					<OnMouseUp>
+						local r,g,b,a = ManaOrbButton.text:GetTextColor()
+						ManaOrbButton.text:SetTextColor(r,g,b,a*2)
+					</OnMouseUp>
+					<OnClick>
+						if D32ConfigFrame:IsVisible() then
+						if D32ConfigFrame.text:GetText() == ManaOrbButton.text:GetText() then
+						D32ConfigFrame:Hide()
+						ManaOrbOptionsDropDown:Hide()
+						else
+						CommitButton.orb = manaOrb
+						CommitButton.orbData = D32CharacterData.manaOrb
+						CommitButton.textureElement = D32CharacterData.manaOrb.textures
+						resetXMLTextBoxes()
+						checkXMLOrbFontPlacement()
+						UpdateXMLTextures(manaOrb)
+						UpdateXMLColors(D32CharacterData.manaOrb.orbColor,D32CharacterData.manaOrb.galaxy,D32CharacterData.manaOrb.font1,D32CharacterData.manaOrb.font2)
+						UpdateXMLText(manaOrb)
+						D32ConfigFrame.text:SetText(ManaOrbButton.text:GetText())
+						D32ConfigFrame.text:SetTextColor(ManaOrbButton.defaultTextColor.r,ManaOrbButton.defaultTextColor.g,ManaOrbButton.defaultTextColor.b,ManaOrbButton.defaultTextColor.a)
+						HealthOrbOptionsDropDown:Hide()
+						ManaOrbOptionsDropDown:Show()
+						end
+						else
+						D32ConfigFrame:Show()
+						CommitButton.orb = manaOrb
+						CommitButton.orbData = D32CharacterData.manaOrb
+						CommitButton.textureElement = D32CharacterData.manaOrb.textures
+						resetXMLTextBoxes()
+						checkXMLOrbFontPlacement()
+						UpdateXMLTextures(manaOrb)
+						UpdateXMLColors(D32CharacterData.manaOrb.orbColor,D32CharacterData.manaOrb.galaxy,D32CharacterData.manaOrb.font1,D32CharacterData.manaOrb.font2)
+						UpdateXMLText(manaOrb)
+						ManaOrbOptionsDropDown:Show()
+						D32ConfigFrame.text:SetText(ManaOrbButton.text:GetText())
+						D32ConfigFrame.text:SetTextColor(ManaOrbButton.defaultTextColor.r,ManaOrbButton.defaultTextColor.g,ManaOrbButton.defaultTextColor.b,ManaOrbButton.defaultTextColor.a)
+						end
+					</OnClick>
+				</Scripts>
+			</Button>
+			<Button name="CloseButton" inherits="UIPanelButtonTemplate" text="Close">
+				<Size>
+					<AbsDimension x="75" y="23" />
+				</Size>
+				<Anchors>
+					<Anchor point="CENTER">
+						<Offset x="-1" y="-201" />
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnMouseUp>
+						Handle_D32GUI()
+					</OnMouseUp>
+				</Scripts>
+			</Button>
+			<CheckButton name="TrackCombatCheckButton" inherits="UICheckButtonTemplate" checked="true">
+				<Anchors>
+					<Anchor point="TOPLEFT">
+						<Offset x="26" y="-281" />
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnClick>
+						if TrackCombatCheckButton:GetChecked() then
+							D32CharacterData.combat.enabled = true
+							if UnitAffectingCombat("player") then
+								updateOrbColor(healthOrb,D32CharacterData.combat.orbColor,D32CharacterData.combat.galaxy, D32CharacterData.combat.font1,D32CharacterData.combat.font2)
+							end
+						else
+							D32CharacterData.combat.enabled = false
+							updateOrbColor(healthOrb,D32CharacterData.healthOrb.orbColor,D32CharacterData.healthOrb.galaxy, D32CharacterData.healthOrb.font1,D32CharacterData.healthOrb.font2)
+						end
+					</OnClick>
+				</Scripts>
+				<ButtonText text="Track Combat" justifyH="RIGHT">
+					<Anchors>
+						<Anchor x="93" y="0" point="RIGHT" />
+					</Anchors>
+				</ButtonText>
+				<NormalFont style="FocusFontSmall" />
+			</CheckButton>
+			<CheckButton name="ShowMainOrbsValuesCheckButton" inherits="UICheckButtonTemplate" checked="true">
+				<Anchors>
+					<Anchor point="TOPLEFT">
+						<Offset x="26" y="-319" />
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnClick>
+						if ShowMainOrbsValuesCheckButton:GetChecked() then
+							D32CharacterData.healthOrb.font2.show = true
+							D32CharacterData.manaOrb.font2.show = true
+							setOrbFontPlacement(healthOrb, D32CharacterData.healthOrb)
+							setOrbFontPlacement(manaOrb, D32CharacterData.manaOrb)
+						else
+							D32CharacterData.healthOrb.font2.show = false
+							D32CharacterData.manaOrb.font2.show = false
+							setOrbFontPlacement(healthOrb, D32CharacterData.healthOrb)
+							setOrbFontPlacement(manaOrb, D32CharacterData.manaOrb)
+						end
+					</OnClick>
+				</Scripts>
+				<ButtonText text="Show Orbs Values" justifyH="RIGHT">
+					<Anchors>
+						<Anchor x="120" y="0" point="RIGHT" />
+					</Anchors>
+				</ButtonText>
+				<NormalFont style="FocusFontSmall" />
+			</CheckButton>
+			<CheckButton name="TruncatedValuesCheckButton" inherits="UICheckButtonTemplate" checked="true">
+				<Anchors>
+					<Anchor point="TOPLEFT">
+						<Offset x="26" y="-243" />
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnClick>
+						if TruncatedValuesCheckButton:GetChecked() then
+						D32CharacterData.values.formatted = true
+						else
+						D32CharacterData.values.formatted = false
+						end
+					</OnClick>
+				</Scripts>
+				<ButtonText text="Format Values" justifyH="RIGHT">
+					<Anchors>
+						<Anchor x="97" y="0" point="RIGHT" />
+					</Anchors>
+				</ButtonText>
+				<NormalFont style="FocusFontSmall" />
+			</CheckButton>
+			<CheckButton name="UsePetOrbCheckButton" inherits="UICheckButtonTemplate" checked="true">
+				<Anchors>
+					<Anchor point="TOPLEFT">
+						<Offset x="179" y="-243" />
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnClick>
+						if UsePetOrbCheckButton:GetChecked() then
+							RegisterUnitWatch(petOrb)
+							D32CharacterData.petOrb.enabled = true
+						else
+							UnregisterUnitWatch(petOrb)
+							petOrb:Hide()
+							D32CharacterData.petOrb.enabled = false
+						end
+					</OnClick>
+				</Scripts>
+				<ButtonText text="Use Pet Orb" justifyH="RIGHT">
+					<Anchors>
+						<Anchor x="82" y="0" point="RIGHT" />
+					</Anchors>
+				</ButtonText>
+				<NormalFont style="FocusFontSmall" />
+			</CheckButton>
+			<CheckButton name="ShowPetOrbValuesCheckButton" inherits="UICheckButtonTemplate" checked="true">
+				<Anchors>
+					<Anchor point="TOPLEFT">
+						<Offset x="179" y="-281" />
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnClick>
+						if ShowPetOrbValuesCheckButton:GetChecked() then
+							petOrb.font3:Show()
+							petOrb.font4:Show()
+							D32CharacterData.petOrb.showValue = true
+							checkPetFontPlacement()
+						else
+							petOrb.font3:Hide()
+							petOrb.font4:Hide()
+							D32CharacterData.petOrb.showValue = False
+							checkPetFontPlacement()
+						end
+					</OnClick>
+				</Scripts>
+				<ButtonText text="Show Pet Values" justifyH="RIGHT">
+					<Anchors>
+						<Anchor x="114" y="0" point="RIGHT" />
+					</Anchors>
+				</ButtonText>
+				<NormalFont style="FocusFontSmall" />
+			</CheckButton>
+			<CheckButton name="ShowPetOrbPercentagesCheckButton" inherits="UICheckButtonTemplate" checked="true">
+				<Anchors>
+					<Anchor point="TOPLEFT">
+						<Offset x="179" y="-319" />
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnClick>
+						if ShowPetOrbPercentagesCheckButton:GetChecked() then
+							petOrb.font1:Show()
+							petOrb.font2:Show()
+							D32CharacterData.petOrb.showPercentage = true
+							checkPetFontPlacement()
+						else
+							petOrb.font1:Hide()
+							petOrb.font2:Hide()
+							D32CharacterData.petOrb.showPercentage = False
+							checkPetFontPlacement()
+						end
+					</OnClick>
+				</Scripts>
+				<ButtonText text="Show Pet Percentage" justifyH="RIGHT">
+					<Anchors>
+						<Anchor x="143" y="0" point="RIGHT" />
+					</Anchors>
+				</ButtonText>
+				<NormalFont style="FocusFontSmall" />
+			</CheckButton>
+			<CheckButton name="ShowMainOrbsPercentagesCheckButton" inherits="UICheckButtonTemplate" checked="true">
+				<Anchors>
+					<Anchor point="TOPLEFT">
+						<Offset x="179" y="-357" />
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnClick>
+						if ShowMainOrbsPercentagesCheckButton:GetChecked() then
+							D32CharacterData.healthOrb.font1.show = true
+							D32CharacterData.manaOrb.font1.show = true
+							setOrbFontPlacement(healthOrb, D32CharacterData.healthOrb)
+							setOrbFontPlacement(manaOrb, D32CharacterData.manaOrb)
+						else
+							D32CharacterData.healthOrb.font1.show = false
+							D32CharacterData.manaOrb.font1.show = false
+							setOrbFontPlacement(healthOrb, D32CharacterData.healthOrb)
+							setOrbFontPlacement(manaOrb, D32CharacterData.manaOrb)
+						end
+					</OnClick>
+				</Scripts>
+				<ButtonText text="Show Orbs Percentage" justifyH="RIGHT">
+					<Anchors>
+						<Anchor x="145" y="0" point="RIGHT" />
+					</Anchors>
+				</ButtonText>
+				<NormalFont style="FocusFontSmall" />
+			</CheckButton>
+			<CheckButton name="UsePowerTrackerCheckButton" inherits="UICheckButtonTemplate" checked="true">
+				<Anchors>
+					<Anchor point="TOPLEFT">
+						<Offset x="26" y="-357" />
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnLoad>
+						if not powerFrame then
+						self:Hide()
+						end
+					</OnLoad>
+					<OnClick>
+						if UsePowerTrackerCheckButton:GetChecked() then
+							if powerFrame then
+								powerFrame:Show()
+								powerFrame:SetScript("OnUpdate",D32MonitorPowers)
+								D32CharacterData.powerFrame.show = true
+							end
+						else
+							if powerFrame then
+								powerFrame:SetScript("OnUpdate",nil)
+								powerFrame:Hide()
+								D32CharacterData.powerFrame.show = false
+							end
+						end
+					</OnClick>
+				</Scripts>
+				<ButtonText text="Use Power Tracker" justifyH="RIGHT">
+					<Anchors>
+						<Anchor x="125" y="0" point="RIGHT" />
+					</Anchors>
+				</ButtonText>
+				<NormalFont style="FocusFontSmall" />
+			</CheckButton>
+			<Slider name="D32ScaleSlider" inherits="OptionsSliderTemplate" minValue="0" maxValue="0">
+				<Size>
+					<AbsDimension x="220" y="16" />
+				</Size>
+				<Anchors>
+					<Anchor point="CENTER">
+						<Offset x="0" y="30" />
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnLoad>
+						getglobal(self:GetName().."Text"):SetText("Global Scale")
+						getglobal(self:GetName().."High"):SetText("150")
+						getglobal(self:GetName().."Low"):SetText("50")
+						self:SetMinMaxValues(50,150)
+						self:SetValueStep(1)
+					</OnLoad>
+					<OnValueChanged>
+						D32SetGlobalScale(self:GetValue())
+					</OnValueChanged>
+				</Scripts>
+			</Slider>
+		</Frames>
+		<Scripts>
+			<OnLoad>
+				self:RegisterForDrag("LeftButton");
+				self:SetClampedToScreen(true);
+			</OnLoad>
+			<OnDragStart>
+				self:StartMoving();
+			</OnDragStart>
+			<OnDragStop>
+				self:StopMovingOrSizing();
+			</OnDragStop>
+			<OnHide>
+				D32GUI.configFrame:Hide()
+			</OnHide>
+		</Scripts>
+	</Frame>
+	<Frame parentKey="configFrame" name="D32ConfigFrame" parent="D32GUI" frameStrata="HIGH">
+		<Size>
+			<AbsDimension x="457" y="450" />
+		</Size>
+		<Anchors>
+			<Anchor point="RIGHT">
+				<Offset x="450" y="0" />
+			</Anchor>
+		</Anchors>
+		<Backdrop bgFile="Interface\DialogFrame\UI-DialogBox-Background" edgeFile="Interface\DialogFrame\UI-DialogBox-Border" tile="true">
+			<BackgroundInsets>
+				<AbsInset left="11" right="12" top="12" bottom="11" />
+			</BackgroundInsets>
+			<TileSize>
+				<AbsValue val="32" />
+			</TileSize>
+			<EdgeSize>
+				<AbsValue val="32" />
+			</EdgeSize>
+		</Backdrop>
+		<Layers>
+			<Layer level="OVERLAY">
+				<FontString name="OrbTextureLabel" font="Interface\AddOns\DrakeishUI\modules\MistrasDiabloOrbs\fonts\Of Wildflowers and Wings.ttf" text="Swirl Texture" justifyV="TOP">
+					<Size>
+						<AbsDimension x="181" y="39" />
+					</Size>
+					<Anchors>
+						<Anchor point="CENTER">
+							<Offset x="-26" y="-180" />
+						</Anchor>
+					</Anchors>
+					<FontHeight>
+						<AbsValue val="19" />
+					</FontHeight>
+					<Color r="1" g="0.5" b="0.5" />
+				</FontString>
+				<FontString name="FillTextureLabel" font="Interface\AddOns\DrakeishUI\modules\MistrasDiabloOrbs\fonts\Of Wildflowers and Wings.ttf" text="Fill Texture" justifyV="TOP">
+					<Size>
+						<AbsDimension x="181" y="39" />
+					</Size>
+					<Anchors>
+						<Anchor point="CENTER">
+							<Offset x="-172" y="-180" />
+						</Anchor>
+					</Anchors>
+					<FontHeight>
+						<AbsValue val="19" />
+					</FontHeight>
+					<Color r="1" g="0.5" b="0.5" />
+				</FontString>
+			</Layer>
+			<Layer level="OVERLAY">
+				<FontString parentKey="text" inherits="BossEmoteNormalHuge" font="Interface\AddOns\DrakeishUI\modules\MistrasDiabloOrbs\fonts\Of Wildflowers and Wings.ttf" text="" justifyV="TOP">
+					<Size>
+						<AbsDimension x="181" y="39" />
+					</Size>
+					<Anchors>
+						<Anchor point="TOP">
+							<Offset x="0" y="-18" />
+						</Anchor>
+					</Anchors>
+					<FontHeight>
+						<AbsValue val="26" />
+					</FontHeight>
+					<Color r="1" g="0" b="0" />
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<CheckButton name="D32OrbPercentageCheckBox" inherits="UICheckButtonTemplate" checked="true">
+				<Anchors>
+					<Anchor point="CENTER">
+						<Offset x="-58" y="-145" />
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnLoad>
+					</OnLoad>
+					<OnClick>
+						checkXMLOrbFontPlacement()
+					</OnClick>
+				</Scripts>
+				<ButtonText text="Show Percentage" justifyH="RIGHT">
+					<Anchors>
+						<Anchor x="115" y="0" point="RIGHT" />
+					</Anchors>
+				</ButtonText>
+				<NormalFont style="FocusFontSmall" />
+			</CheckButton>
+			<CheckButton name="D32OrbValueCheckBox" inherits="UICheckButtonTemplate" checked="true">
+				<Anchors>
+					<Anchor point="CENTER">
+						<Offset x="-197" y="-145" />
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnShow>
+
+					</OnShow>
+					<OnLoad>
+					</OnLoad>
+					<OnClick>
+						checkXMLOrbFontPlacement()
+					</OnClick>
+				</Scripts>
+				<ButtonText text="Show Value" justifyH="RIGHT">
+					<Anchors>
+						<Anchor x="75" y="0" point="RIGHT" />
+					</Anchors>
+				</ButtonText>
+				<NormalFont style="FocusFontSmall" />
+			</CheckButton>
+			<Frame name="xmlOrbDisplayFrame2" toplevel="true">
+				<Size x="150" y="150" />
+				<Anchors>
+					<Anchor point="CENTER">
+						<Offset x="0" y="10" />
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnLoad>
+						FillXMLTemplate(self)
+					</OnLoad>
+				</Scripts>
+			</Frame>
+		</Frames>
+		<Scripts>
+			<OnLoad>
+				D32ConfigFrame:Hide()
+				D32ConfigFrame:SetClampedToScreen(true)
+			</OnLoad>
+		</Scripts>
+	</Frame>
+	<Frame parentKey="OptionsButtonPanel" parent="D32ConfigFrame">
+		<Size>
+			<AbsDimension x="457" y="268" />
+		</Size>
+		<Anchors>
+			<Anchor point="CENTER">
+				<Offset x="-435" y="101" />
+			</Anchor>
+		</Anchors>
+		<Frames>
+			<Frame name="ButtonListFrame" parent="D32ConfigFrame">
+				<Size>
+					<AbsDimension x="451" y="56" />
+				</Size>
+				<Anchors>
+					<Anchor point="CENTER">
+						<Offset x="0" y="165" />
+					</Anchor>
+				</Anchors>
+				<Frames>
+					<Button name="FillButton" inherits="UIPanelButtonTemplate" text="Fill">
+						<Size>
+							<AbsDimension x="75" y="23" />
+						</Size>
+						<Anchors>
+							<Anchor point="TOPLEFT">
+								<Offset x="50" y="-17" />
+							</Anchor>
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								ColorPickerFrame:Hide()
+								D32ColorPicker("Filling")
+							</OnClick>
+						</Scripts>
+					</Button>
+					<Button name="SwirlButton" inherits="UIPanelButtonTemplate" text="Swirl">
+						<Size>
+							<AbsDimension x="75" y="23" />
+						</Size>
+						<Anchors>
+							<Anchor point="TOPLEFT">
+								<Offset x="144" y="-17" />
+							</Anchor>
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								ColorPickerFrame:Hide()
+								D32ColorPicker("Swirl")
+							</OnClick>
+						</Scripts>
+					</Button>
+					<Button name="PercentageButton" inherits="UIPanelButtonTemplate" text="Percentage">
+						<Size>
+							<AbsDimension x="85" y="23" />
+						</Size>
+						<Anchors>
+							<Anchor point="TOPLEFT">
+								<Offset x="229" y="-17" />
+							</Anchor>
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								ColorPickerFrame:Hide()
+								D32ColorPicker("Font1")
+							</OnClick>
+						</Scripts>
+					</Button>
+					<Button name="ValueButton" inherits="UIPanelButtonTemplate" text="Value">
+						<Size>
+							<AbsDimension x="75" y="23" />
+						</Size>
+						<Anchors>
+							<Anchor point="TOPLEFT">
+								<Offset x="329" y="-17" />
+							</Anchor>
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								ColorPickerFrame:Hide()
+								D32ColorPicker("Font2")
+							</OnClick>
+						</Scripts>
+					</Button>
+				</Frames>
+			</Frame>
+			<Button name="D32ConfigFrameCloseButton" inherits="UIPanelCloseButton" parent="D32ConfigFrame" text="">
+				<Size>
+					<AbsDimension x="35" y="35" />
+				</Size>
+				<Anchors>
+					<Anchor point="TOPLEFT">
+						<Offset x="422" y="0" />
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnClick>
+						D32ConfigFrame:Hide()
+						ManaOrbOptionsDropDown:Hide()
+						HealthOrbOptionsDropDown:Hide()
+					</OnClick>
+				</Scripts>
+			</Button>
+		</Frames>
+	</Frame>
+	<Button name="CommitButton" inherits="GameMenuButtonTemplate" parent="D32ConfigFrame" text="Commit Changes">
+		<Size>
+			<AbsDimension x="133" y="23" />
+		</Size>
+		<Anchors>
+			<Anchor point="BOTTOM">
+				<Offset x="138" y="20" />
+			</Anchor>
+		</Anchors>
+		<Scripts>
+			<OnClick>
+				D32ApplyChanges()
+			</OnClick>
+		</Scripts>
+	</Button>
+	<Button name="HealthOrbOptionsDropDown" inherits="UIDropDownMenuTemplate" hidden="true" parent="D32ConfigFrame">
+		<Size x="200" y="45" />
+		<Anchors>
+			<Anchor point="TOPLEFT">
+				<Offset x="0" y="-15" />
+			</Anchor>
+		</Anchors>
+		<Scripts>
+			<OnLoad>
+				CommitButton.activeElement = D32CharacterData.healthOrb
+				local fillOptions = {
+				"Default",
+				"Combat"
+				}
+				function HealthOrbOptionsDropDown:OnClick(value)
+				UIDropDownMenu_SetSelectedID(HealthOrbOptionsDropDown,self:GetID())
+				local buttonText = UIDropDownMenu_GetText(HealthOrbOptionsDropDown)
+				if buttonText == "Combat" then
+				CommitButton.activeElement = D32CharacterData.combat
+				UpdateXMLColors(CommitButton.activeElement.orbColor,CommitButton.activeElement.galaxy,CommitButton.activeElement.font1,CommitButton.activeElement.font2)
+				elseif buttonText == "Default" then
+				CommitButton.activeElement = D32CharacterData.healthOrb
+				UpdateXMLColors(CommitButton.activeElement.orbColor,CommitButton.activeElement.galaxy,CommitButton.activeElement.font1,CommitButton.activeElement.font2)
+				end
+				end
+
+				local function initMen(self, level)
+				local stuff = UIDropDownMenu_CreateInfo()
+				for k,v in pairs(fillOptions) do
+				stuff = {}
+				stuff.text = v
+				stuff.value = v
+				stuff.func = HealthOrbOptionsDropDown.OnClick
+				UIDropDownMenu_AddButton(stuff, level)
+				end
+				end
+				UIDropDownMenu_Initialize(HealthOrbOptionsDropDown, initMen)
+				UIDropDownMenu_SetSelectedID(HealthOrbOptionsDropDown, 1)
+				UIDropDownMenu_JustifyText(HealthOrbOptionsDropDown, "LEFT")
+			</OnLoad>
+			<OnShow>
+				local buttonText = UIDropDownMenu_GetText(HealthOrbOptionsDropDown)
+				if buttonText == "Combat" then
+				CommitButton.activeElement = D32CharacterData.combat
+				elseif buttonText == "Default" then
+				CommitButton.activeElement = D32CharacterData.healthOrb
+				end
+				UpdateXMLColors(CommitButton.activeElement.orbColor,CommitButton.activeElement.galaxy,CommitButton.activeElement.font1,CommitButton.activeElement.font2)
+			</OnShow>
+		</Scripts>
+	</Button>
+	<Button name="ManaOrbOptionsDropDown" inherits="UIDropDownMenuTemplate" hidden="true" parent="D32ConfigFrame">
+		<Size x="200" y="45" />
+		<Anchors>
+			<Anchor point="TOPLEFT">
+				<Offset x="0" y="-15" />
+			</Anchor>
+		</Anchors>
+		<Scripts>
+			<OnLoad>
+				CommitButton.activeElement = D32CharacterData.manaOrb
+				local fillOptions2 = {
+				"Default"
+				}
+				if D32className == "Druid" then
+				fillOptions2 = {
+				"Default",
+				"Bear",
+				"Cat"
+				}
+				end
+				function ManaOrbOptionsDropDown:OnClick(value)
+				UIDropDownMenu_SetSelectedID(ManaOrbOptionsDropDown,self:GetID())
+				local buttonText = UIDropDownMenu_GetText(ManaOrbOptionsDropDown)
+				if buttonText == "Bear" then
+				CommitButton.activeElement = D32CharacterData.druidColors.bear
+				UpdateXMLColors(CommitButton.activeElement.orbColor,CommitButton.activeElement.galaxy,CommitButton.activeElement.font1,CommitButton.activeElement.font2)
+				elseif buttonText == "Cat" then
+				CommitButton.activeElement = D32CharacterData.druidColors.cat
+				UpdateXMLColors(CommitButton.activeElement.orbColor,CommitButton.activeElement.galaxy,CommitButton.activeElement.font1,CommitButton.activeElement.font2)
+				elseif buttonText == "Default" then
+				CommitButton.activeElement = D32CharacterData.manaOrb
+				UpdateXMLColors(CommitButton.activeElement.orbColor,CommitButton.activeElement.galaxy,CommitButton.activeElement.font1,CommitButton.activeElement.font2)
+				end
+				end
+
+				local function initMen(self, level)
+				local stuff = UIDropDownMenu_CreateInfo()
+				for k,v in pairs(fillOptions2) do
+				stuff = {}
+				stuff.text = v
+				stuff.value = v
+				stuff.func = ManaOrbOptionsDropDown.OnClick
+				UIDropDownMenu_AddButton(stuff, level)
+				end
+				end
+				UIDropDownMenu_Initialize(ManaOrbOptionsDropDown, initMen)
+				UIDropDownMenu_SetSelectedID(ManaOrbOptionsDropDown, 1)
+				UIDropDownMenu_JustifyText(ManaOrbOptionsDropDown, "LEFT")
+			</OnLoad>
+			<OnShow>
+				local buttonText = UIDropDownMenu_GetText(ManaOrbOptionsDropDown)
+				if buttonText == "Bear" then
+				CommitButton.activeElement = D32CharacterData.druidColors.bear
+				elseif buttonText == "Cat" then
+				CommitButton.activeElement = D32CharacterData.druidColors.cat
+				elseif buttonText == "Default" then
+				CommitButton.activeElement = D32CharacterData.manaOrb
+				end
+				UpdateXMLColors(CommitButton.activeElement.orbColor,CommitButton.activeElement.galaxy,CommitButton.activeElement.font1,CommitButton.activeElement.font2)
+			</OnShow>
+		</Scripts>
+	</Button>
+	<Button name="FillTexturesDropDown" inherits="UIDropDownMenuTemplate" parent="D32ConfigFrame">
+		<Size x="200" y="45" />
+		<Anchors>
+			<Anchor point="BOTTOM">
+				<Offset x="-125" y="15" />
+			</Anchor>
+		</Anchors>
+		<Scripts>
+			<OnLoad>
+				function FillTexturesDropDown:OnClick(value)
+				UIDropDownMenu_SetSelectedID(FillTexturesDropDown,self:GetID())
+				TryNewTextures(D32FillTextureChoices[self:GetID() - 1],nil)
+				end
+
+				local textureNameTable = {
+				[0] = "Moon",
+				[1] = "Mist",
+				[2] = "Liquid Metal",
+				[3] = "Dragon Skin",
+				[4] = "Iris",
+				[5] = "Fractals",
+				[6] = "Warped"
+				}
+				local function fillMenu(self, level)
+				local num = table.getn(textureNameTable)
+				for i=0,num,1 do
+				local val = textureNameTable[i]
+				stuff = {}
+				stuff.text = val
+				stuff.value = val
+				stuff.func = FillTexturesDropDown.OnClick
+				UIDropDownMenu_AddButton(stuff, level)
+				end
+				end
+				UIDropDownMenu_Initialize(FillTexturesDropDown, fillMenu)
+				UIDropDownMenu_SetSelectedID(FillTexturesDropDown, 1)
+				UIDropDownMenu_JustifyText(FillTexturesDropDown, "LEFT")
+			</OnLoad>
+			<OnShow>
+
+			</OnShow>
+		</Scripts>
+	</Button>
+	<Button name="RotationTexturesDropDown" inherits="UIDropDownMenuTemplate" parent="D32ConfigFrame">
+		<Size x="200" y="45" />
+		<Anchors>
+			<Anchor point="BOTTOM">
+				<Offset x="12" y="15" />
+			</Anchor>
+		</Anchors>
+		<Scripts>
+			<OnLoad>
+				function RotationTexturesDropDown:OnClick(value)
+				UIDropDownMenu_SetSelectedID(RotationTexturesDropDown,self:GetID())
+				TryNewTextures(xmlOrbDisplayFrame2.orb.filling:GetTexture(),D32RotationTextureChoices[self:GetID() - 1])
+				end
+
+				local textureNameTable2 = {
+				[0] = "Galaxy",
+				[1] = "Bubbles",
+				[2] = "Eye Glow",
+				}
+				local function rotationMenu(self, level)
+				local num = table.getn(textureNameTable2)
+				for i=0,num,1 do
+				local val = textureNameTable2[i]
+				stuff = {}
+				stuff.text = val
+				stuff.value = val
+				stuff.func = RotationTexturesDropDown.OnClick
+				UIDropDownMenu_AddButton(stuff, level)
+				end
+				end
+				UIDropDownMenu_Initialize(RotationTexturesDropDown, rotationMenu)
+				UIDropDownMenu_SetSelectedID(RotationTexturesDropDown, 1)
+				UIDropDownMenu_JustifyText(RotationTexturesDropDown, "LEFT")
+			</OnLoad>
+			<OnShow>
+
+			</OnShow>
+		</Scripts>
+	</Button>
+</Ui>

@@ -1,0 +1,9 @@
+## Title: Mistra's Diablo Orbs
+## Version: 1.0
+## Author: John
+## Interface: 30300
+## SavedVariablesPerCharacter: D32CharacterData
+## SavedVariables: D32MiniMapButtonPosition
+## Notes: Fully customizable Diablo Orbs, for WoW!
+MistrasDiabloOrbs.xml 
+MD32MinimapButton.xml

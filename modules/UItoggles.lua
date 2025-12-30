@@ -356,24 +356,21 @@ local button7 = CreateCheckbox(tooltipFrame, 'DrakeishUI_Toggle7', 'Toggle Micro
     -- Use the existing bagsToggleButton by its global name
     if _G.bagstoggle then
         _G.bagstoggle:Click()
+        -- Update button position immediately after clicking (bags_state is updated synchronously)
+        UpdateButtonPosition()
     else
         -- Fallback to simple micromenu toggle
         local checked = self:GetChecked()
         if checked then
             MainMenuBarArtFrame:Hide()
+            bags_state = 1
         else
             MainMenuBarArtFrame:Show()
+            bags_state = 0
         end
+        -- Update button position immediately
+        UpdateButtonPosition()
     end
-    -- Update button position after micromenu toggle
-    local timer = CreateFrame("Frame")
-    timer:SetScript("OnUpdate", function(self, delta)
-        self.elapsed = (self.elapsed or 0) + delta
-        if self.elapsed >= 0.1 then
-            UpdateButtonPosition()
-            self:SetScript("OnUpdate", nil)
-        end
-    end)
 end)
 
 local button8 = CreateCheckbox(tooltipFrame, 'DrakeishUI_Toggle8', 'Toggle Quest Frame', -25, -90, function(self)
@@ -403,12 +400,16 @@ local button9 = CreateCheckbox(tooltipFrame, 'DrakeishUI_Toggle9', 'Toggle Buff 
             if self.elapsed >= 0.1 then
                 -- Check the actual state of the buff frames and update checkbox accordingly
                 -- Inverted display logic: visible = unchecked, hidden = checked
-                if BuffFrame:IsShown() then
-                    button9:SetChecked(false)  -- Visible = unchecked (inverted display)
-                    buffs_state = 1
-                else
-                    button9:SetChecked(true)   -- Hidden = checked (inverted display)
-                    buffs_state = 0
+                -- Use button9 or fallback to global frame name
+                local buffButton = button9 or _G.DrakeishUI_Toggle9
+                if buffButton then
+                    if BuffFrame:IsShown() then
+                        buffButton:SetChecked(false)  -- Visible = unchecked (inverted display)
+                        buffs_state = 1
+                    else
+                        buffButton:SetChecked(true)   -- Hidden = checked (inverted display)
+                        buffs_state = 0
+                    end
                 end
                 self:SetScript("OnUpdate", nil)
             end
@@ -543,10 +544,10 @@ local function MoveToDragonflightPositions()
     CastingBarFrame:ClearAllPoints()
     CastingBarFrame:SetPoint('BOTTOM', UIParent, 'BOTTOM', 0, 250)
     
-    -- Target castbar: below target frame
+    -- Target castbar: below target frame (use same position as Castbar.lua)
     if TargetFrameSpellBar then
         TargetFrameSpellBar:ClearAllPoints()
-        TargetFrameSpellBar:SetPoint('TOPLEFT', TargetFrame, 'BOTTOMLEFT', 0, -10)
+        TargetFrameSpellBar:SetPoint('TOPLEFT', TargetFrame, 'BOTTOMLEFT', 25 - 20, 22)
     end
 end
 
@@ -586,6 +587,13 @@ local button11 = CreateCheckbox(tooltipFrame, 'DrakeishUI_Toggle11', 'Reposition
     local checked = self:GetChecked()
     
     if checked then
+        -- Disable Diablo Orbs checkbox to prevent conflicts
+        local diabloButton = _G.DrakeishUI_Toggle13
+        if diabloButton then
+            diabloButton:Disable()
+            diabloButton:SetAlpha(0.5)
+        end
+        
         -- Move to DragonflightUI positions above action bars
         MoveToDragonflightPositions()
         unitframes_state = 1
@@ -608,6 +616,14 @@ local button11 = CreateCheckbox(tooltipFrame, 'DrakeishUI_Toggle11', 'Reposition
             end
         end)
     else
+        -- Re-enable Diablo Orbs checkbox
+        local diabloButton = _G.DrakeishUI_Toggle13
+        if diabloButton then
+            diabloButton:Enable()
+            diabloButton:EnableMouse(true)
+            diabloButton:SetAlpha(1.0)
+        end
+        
         -- Restore original positions
         RestoreOriginalPositions()
         unitframes_state = 0
@@ -621,15 +637,95 @@ local button11 = CreateCheckbox(tooltipFrame, 'DrakeishUI_Toggle11', 'Reposition
 end)
 
 -- Gryphon style functions
-local function ApplyGryphonStyle(style)
+function ApplyGryphonStyle(style)
     if not MainMenuBarLeftEndCap or not MainMenuBarRightEndCap then return end
+    
+    -- Handle angel/demon state (4)
+    if style == 4 then -- angel and demon together
+        -- Hide gryphons
+        MainMenuBarLeftEndCap:Hide()
+        MainMenuBarRightEndCap:Hide()
+        
+        -- Check if toggle is off - if so, hide angel/demon and return
+        if caps_state == 0 then
+            if _G.D32AngelFrame then _G.D32AngelFrame:Hide() end
+            if _G.D32DemonFrame then _G.D32DemonFrame:Hide() end
+            -- Update saved state
+            if D32CharacterData then D32CharacterData.artwork.show = false end
+            return
+        end
+        
+        -- Show both angel and demon (frames are created as D32AngelFrame and D32DemonFrame)
+        -- Check if orbs are shown or hidden to determine proper parentage
+        local orbsShown = _G.D32_HealthOrb and _G.D32_HealthOrb:IsShown() and _G.D32_ManaOrb and _G.D32_ManaOrb:IsShown()
+        
+        if orbsShown then
+            -- Orbs are shown, reparent angel/demon to orbs
+            if _G.D32AngelFrame and _G.manaOrb then
+                _G.D32AngelFrame:SetParent(_G.manaOrb)
+                _G.D32AngelFrame:ClearAllPoints()
+                _G.D32AngelFrame:SetPoint("CENTER", _G.manaOrb, "CENTER", -64, 5)
+                _G.D32AngelFrame:SetFrameStrata("MEDIUM")
+                _G.D32AngelFrame:SetFrameLevel(3)
+                _G.D32AngelFrame:Show()
+            end
+            if _G.D32DemonFrame and _G.healthOrb then
+                _G.D32DemonFrame:SetParent(_G.healthOrb)
+                _G.D32DemonFrame:ClearAllPoints()
+                _G.D32DemonFrame:SetPoint("CENTER", _G.healthOrb, "CENTER", 44, 5)
+                _G.D32DemonFrame:SetFrameStrata("MEDIUM")
+                _G.D32DemonFrame:SetFrameLevel(3)
+                _G.D32DemonFrame:Show()
+            end
+        else
+            -- Orbs are hidden, reparent angel/demon to UIParent
+            if _G.D32AngelFrame and _G.manaOrb then
+                _G.D32AngelFrame:SetParent(UIParent)
+                _G.D32AngelFrame:ClearAllPoints()
+                _G.D32AngelFrame:SetFrameStrata("MEDIUM")
+                _G.D32AngelFrame:SetFrameLevel(3)
+                -- Get absolute position from manaOrb
+                local absX, absY = _G.manaOrb:GetCenter()
+                if absX and absY then
+                    _G.D32AngelFrame:SetPoint("CENTER", UIParent, "BOTTOMLEFT", absX + (-64), absY + 5)
+                else
+                    _G.D32AngelFrame:SetPoint("CENTER", UIParent, "CENTER", -64, 5)
+                end
+                _G.D32AngelFrame:Show()
+            end
+            if _G.D32DemonFrame and _G.healthOrb then
+                _G.D32DemonFrame:SetParent(UIParent)
+                _G.D32DemonFrame:ClearAllPoints()
+                _G.D32DemonFrame:SetFrameStrata("MEDIUM")
+                _G.D32DemonFrame:SetFrameLevel(3)
+                -- Get absolute position from healthOrb
+                local absX, absY = _G.healthOrb:GetCenter()
+                if absX and absY then
+                    _G.D32DemonFrame:SetPoint("CENTER", UIParent, "BOTTOMLEFT", absX + 44, absY + 5)
+                else
+                    _G.D32DemonFrame:SetPoint("CENTER", UIParent, "CENTER", 50, 5)
+                end
+                _G.D32DemonFrame:Show()
+            end
+        end
+        -- Update saved state
+        if D32CharacterData then D32CharacterData.artwork.show = true end
+        return
+    else
+        -- Hide angel/demon for gryphon styles
+        if _G.D32AngelFrame then _G.D32AngelFrame:Hide() end
+        if _G.D32DemonFrame then _G.D32DemonFrame:Hide() end
+        -- Update saved state
+        if D32CharacterData then D32CharacterData.artwork.show = false end
+    end
+    
     if caps_state == 0 then
         MainMenuBarLeftEndCap:Hide()
         MainMenuBarRightEndCap:Hide()
         return
     end
         if style == 1 then -- old
-        MainMenuBarLeftEndCap:SetClearPoint('BOTTOMLEFT', -85, -22)
+        MainMenuBarLeftEndCap:SetClearPoint('BOTTOMLEFT', -82, -22)
         MainMenuBarRightEndCap:SetClearPoint('BOTTOMRIGHT', 84, -22)
         MainMenuBarLeftEndCap:set_atlas('ui-hud-actionbar-gryphon-left', true)
         MainMenuBarRightEndCap:set_atlas('ui-hud-actionbar-gryphon-right', true)
@@ -653,13 +749,14 @@ local function ApplyGryphonStyle(style)
         MainMenuBarLeftEndCap:Hide()
         MainMenuBarRightEndCap:Hide()
     end
+    
 end
 
 -- Gryphon style checkbox with number states
 local button12 = CreateCheckbox(tooltipFrame, 'DrakeishUI_Toggle12', 'Choose Gryphon Style', 125, -90, function(self)
-    -- Cycle through states: 1=old, 2=new, 3=flying
+    -- Cycle through states: 1=old, 2=new, 3=flying, 4=angel+demon
     gryphon_style_state = (gryphon_style_state or 1) + 1
-    if gryphon_style_state > 3 then
+    if gryphon_style_state > 4 then
         gryphon_style_state = 1
     end
     
@@ -697,6 +794,345 @@ button12:SetScript('OnClick', function(self)
     end)
 end)
 
+-- Function to toggle Diablo Orbs visibility
+function ToggleDiabloOrbs(show)
+    if show then
+        -- Show custom Diablo target frame and hide default
+        if _G.ShowDiabloTargetFrame then
+            _G.ShowDiabloTargetFrame()
+        else
+            -- If function not available yet, try again after a short delay
+            local delayFrame = CreateFrame("Frame")
+            delayFrame:SetScript("OnUpdate", function(self, delta)
+                self.elapsed = (self.elapsed or 0) + delta
+                if self.elapsed >= 0.1 then
+                    if _G.ShowDiabloTargetFrame then
+                        _G.ShowDiabloTargetFrame()
+                    end
+                    self:SetScript("OnUpdate", nil)
+                end
+            end)
+        end
+        -- Show orbs - use original Show method to bypass hook if needed
+        if _G.D32_HealthOrb then
+            if _G.D32_HealthOrb.hookedByDrakeishUI and _G.D32_HealthOrb.originalShow then
+                _G.D32_HealthOrb.originalShow(_G.D32_HealthOrb)
+            else
+                _G.D32_HealthOrb:Show()
+            end
+        end
+        if _G.D32_ManaOrb then
+            if _G.D32_ManaOrb.hookedByDrakeishUI and _G.D32_ManaOrb.originalShow then
+                _G.D32_ManaOrb.originalShow(_G.D32_ManaOrb)
+            else
+                _G.D32_ManaOrb:Show()
+            end
+        end
+        -- Only show pet orb if it's enabled and a pet exists
+        -- RegisterUnitWatch will handle automatic showing/hiding when pet is summoned/dismissed
+        if _G.D32_PetOrb then
+            -- Check if pet orb is enabled and a pet exists before showing
+            if _G.D32CharacterData and _G.D32CharacterData.petOrb and _G.D32CharacterData.petOrb.enabled then
+                if UnitExists("pet") then
+                    -- Pet exists, show the orb
+                    if _G.D32_PetOrb.hookedByDrakeishUI and _G.D32_PetOrb.originalShow then
+                        _G.D32_PetOrb.originalShow(_G.D32_PetOrb)
+                    else
+                        _G.D32_PetOrb:Show()
+                    end
+                else
+                    -- No pet exists, don't show it (RegisterUnitWatch will show it automatically when pet is summoned)
+                    -- Ensure RegisterUnitWatch is active so it will show when pet is summoned
+                    if _G.petOrb then
+                        RegisterUnitWatch(_G.petOrb)
+                    end
+                end
+            else
+                -- Pet orb is disabled, ensure it's hidden and unregistered
+                if _G.D32_PetOrb then
+                    _G.D32_PetOrb:Hide()
+                end
+                if _G.petOrb then
+                    UnregisterUnitWatch(_G.petOrb)
+                end
+            end
+        end
+        -- Re-enable update scripts if they exist (healthOrb and manaOrb are global in MistrasDiabloOrbs)
+        -- CRITICAL: These scripts set the font text values, which may be needed for fonts to render
+        if _G.healthOrb and _G.monitorHealth then
+            _G.healthOrb:SetScript("OnUpdate", _G.monitorHealth)
+            -- Force an immediate update to set font text values
+            _G.monitorHealth(_G.healthOrb)
+        end
+        if _G.manaOrb and _G.monitorPower then
+            _G.manaOrb:SetScript("OnUpdate", _G.monitorPower)
+            -- Force an immediate update to set font text values
+            _G.monitorPower(_G.manaOrb)
+        end
+        -- Initialize everything like on ADDON_LOADED
+        -- CRITICAL: We must ensure orb frames are visible BEFORE calling updateColorsFromMemory
+        -- because fonts can't be shown if their parent is hidden
+        -- Use a small delay to ensure frames are fully shown before initializing fonts
+        local fontInitTimer = CreateFrame("Frame")
+        fontInitTimer:SetScript("OnUpdate", function(self, delta)
+            self.elapsed = (self.elapsed or 0) + delta
+            if self.elapsed >= 0.05 then -- Wait for one frame update cycle
+                if _G.D32CharacterData and _G.healthOrb and _G.manaOrb then
+                    -- Step 1: Ensure orb frames are actually visible FIRST
+                    if _G.D32_HealthOrb and not _G.D32_HealthOrb:IsShown() then
+                        _G.D32_HealthOrb:Show()
+                    end
+                    if _G.D32_ManaOrb and not _G.D32_ManaOrb:IsShown() then
+                        _G.D32_ManaOrb:Show()
+                    end
+                    
+                    -- Step 2: Call checkDefaultsFromMemory FIRST (like on ADDON_LOADED)
+                    -- This ensures all defaults are set up before we try to use them
+                    if _G.checkDefaultsFromMemory then
+                        _G.checkDefaultsFromMemory()
+                    end
+                    
+                    -- Step 3: Ensure fontHolder is visible (fonts are children of fontHolder)
+                    if _G.healthOrb.fontHolder then
+                        _G.healthOrb.fontHolder:Show()
+                    end
+                    if _G.manaOrb.fontHolder then
+                        _G.manaOrb.fontHolder:Show()
+                    end
+                    
+                    -- Step 4: Force fonts to be hidden first, then shown (resets their state)
+                    -- This is critical because fonts might have been shown while parent was hidden
+                    if _G.healthOrb.font1 then _G.healthOrb.font1:Hide() end
+                    if _G.healthOrb.font2 then _G.healthOrb.font2:Hide() end
+                    if _G.manaOrb.font1 then _G.manaOrb.font1:Hide() end
+                    if _G.manaOrb.font2 then _G.manaOrb.font2:Hide() end
+                    
+                    -- Step 5: Call the full updateColorsFromMemory function (like on ADDON_LOADED)
+                    -- This includes setOrbFontPlacement which properly shows/hides fonts
+                    if _G.updateColorsFromMemory then
+                        _G.updateColorsFromMemory()
+                    end
+                    
+                    -- Step 5: Call UpdateOrbTextures (like on ADDON_LOADED)
+                    if _G.UpdateOrbTextures then
+                        _G.UpdateOrbTextures()
+                    end
+                    
+                    -- Step 6: Call D32UpdateOrbColor like in ADDON_LOADED (after updateColorsFromMemory and UpdateOrbTextures)
+                    if _G.D32UpdateOrbColor then
+                        _G.D32UpdateOrbColor(_G.healthOrb, _G.D32CharacterData.healthOrb.orbColor, _G.D32CharacterData.healthOrb.galaxy, _G.D32CharacterData.healthOrb.font1, _G.D32CharacterData.healthOrb.font2)
+                        if _G.D32className == "Druid" then
+                            -- Druid has special handling, but we'll just update mana orb normally for now
+                            -- The actual checkShapeShiftInfo would be called in the real ADDON_LOADED
+                        else
+                            _G.D32UpdateOrbColor(_G.manaOrb, _G.D32CharacterData.manaOrb.orbColor, _G.D32CharacterData.manaOrb.galaxy, _G.D32CharacterData.manaOrb.font1, _G.D32CharacterData.manaOrb.font2)
+                        end
+                    end
+                    
+                    
+                    -- Step 7: Explicitly show fonts that should be visible (in case setOrbFontPlacement didn't work)
+                    if _G.healthOrb.font1 and _G.D32CharacterData.healthOrb.font1.show then
+                        _G.healthOrb.font1:Show()
+                    end
+                    if _G.healthOrb.font2 and _G.D32CharacterData.healthOrb.font2.show then
+                        _G.healthOrb.font2:Show()
+                    end
+                    if _G.manaOrb.font1 and _G.D32CharacterData.manaOrb.font1.show then
+                        _G.manaOrb.font1:Show()
+                    end
+                    if _G.manaOrb.font2 and _G.D32CharacterData.manaOrb.font2.show then
+                        _G.manaOrb.font2:Show()
+                    end
+                end
+                self:SetScript("OnUpdate", nil)
+            end
+        end)
+        -- Restore font visibility for pet orb - replicate checkDefaultsFromMemory() pet font handling
+        if _G.petOrb and _G.D32CharacterData then
+            -- Hide fonts that shouldn't be shown (like in checkDefaultsFromMemory)
+            if not _G.D32CharacterData.petOrb.showValue then
+                if _G.petOrb.font3 then _G.petOrb.font3:Hide() end
+                if _G.petOrb.font4 then _G.petOrb.font4:Hide() end
+            end
+            if not _G.D32CharacterData.petOrb.showPercentage then
+                if _G.petOrb.font1 then _G.petOrb.font1:Hide() end
+                if _G.petOrb.font2 then _G.petOrb.font2:Hide() end
+            end
+            -- Then call checkPetFontPlacement to show the ones that should be visible
+            if _G.checkPetFontPlacement then
+                _G.checkPetFontPlacement()
+            end
+        end
+        -- When orbs are shown, restore angel/demon parentage if needed
+        -- If gryphon style is state 4, they should be children of orbs
+        if gryphon_style_state == 4 then
+            -- Reparent angel and demon back to their original parents (manaOrb and healthOrb)
+            -- Ensure frame levels are set correctly so they appear above the orbs
+            if _G.D32AngelFrame and _G.manaOrb then
+                _G.D32AngelFrame:SetParent(_G.manaOrb)
+                _G.D32AngelFrame:ClearAllPoints()
+                _G.D32AngelFrame:SetPoint("CENTER", _G.manaOrb, "CENTER", -64, 5)
+                -- Ensure frame strata and level are correct (HIGH strata, level 10 - above orbs but below toggles)
+                _G.D32AngelFrame:SetFrameStrata("MEDIUM")
+                _G.D32AngelFrame:SetFrameLevel(3)
+                _G.D32AngelFrame:Show()
+            end
+            if _G.D32DemonFrame and _G.healthOrb then
+                _G.D32DemonFrame:SetParent(_G.healthOrb)
+                _G.D32DemonFrame:ClearAllPoints()
+                _G.D32DemonFrame:SetPoint("CENTER", _G.healthOrb, "CENTER", 44, 5)
+                -- Ensure frame strata and level are correct (HIGH strata, level 10 - above orbs but below toggles)
+                _G.D32DemonFrame:SetFrameStrata("MEDIUM")
+                _G.D32DemonFrame:SetFrameLevel(3)
+                _G.D32DemonFrame:Show()
+            end
+        else
+            -- Hide angel/demon when orbs are shown but not in state 4
+            if _G.D32AngelFrame then _G.D32AngelFrame:Hide() end
+            if _G.D32DemonFrame then _G.D32DemonFrame:Hide() end
+        end
+        -- Apply gryphon style to ensure correct state
+        if gryphon_style_state then
+            ApplyGryphonStyle(gryphon_style_state)
+        end
+        -- Move party frames to the same position as when "Reposition Unitframes" is active
+        -- This is done by temporarily setting unitframes_state to 1, updating positions, then restoring
+        local saved_unitframes_state = unitframes_state
+        unitframes_state = 1
+        if _G.UpdatePartyFramePositions then
+            _G.UpdatePartyFramePositions()
+        end
+        unitframes_state = saved_unitframes_state
+        -- Target frame stays in its normal position when orbs are shown
+        -- Hide player frame when orbs are shown
+        if _G.handlePlayerFrame then
+            _G.handlePlayerFrame(false)
+        elseif PlayerFrame then
+            PlayerFrame:SetScript("OnEvent", nil)
+            PlayerFrame:Hide()
+        end
+    else
+        -- Hide orbs
+        if _G.D32_HealthOrb then _G.D32_HealthOrb:Hide() end
+        if _G.D32_ManaOrb then _G.D32_ManaOrb:Hide() end
+        if _G.D32_PetOrb then _G.D32_PetOrb:Hide() end
+        -- Disable update scripts
+        if _G.healthOrb then
+            _G.healthOrb:SetScript("OnUpdate", nil)
+        end
+        if _G.manaOrb then
+            _G.manaOrb:SetScript("OnUpdate", nil)
+        end
+        -- If gryphon style is state 4 (angel + demon), show them even when orbs are hidden
+        -- Angel and demon are children of the orbs, so they get hidden when orbs are hidden
+        -- We need to reparent them to UIParent so they can be shown independently
+        if gryphon_style_state == 4 then
+            if _G.D32AngelFrame and _G.manaOrb then
+                -- Store original position relative to manaOrb
+                local point, relativeTo, relativePoint, xOfs, yOfs = _G.D32AngelFrame:GetPoint()
+                -- Reparent to UIParent
+                _G.D32AngelFrame:SetParent(UIParent)
+                _G.D32AngelFrame:ClearAllPoints()
+                -- Ensure frame strata and level are preserved (HIGH strata, level 10 - above orbs but below toggles)
+                _G.D32AngelFrame:SetFrameStrata("MEDIUM")
+                _G.D32AngelFrame:SetFrameLevel(3)
+                -- Get absolute position
+                local absX, absY = _G.manaOrb:GetCenter()
+                if absX and absY then
+                    _G.D32AngelFrame:SetPoint("CENTER", UIParent, "BOTTOMLEFT", absX + (-64), absY + 5)
+                else
+                    _G.D32AngelFrame:SetPoint("CENTER", UIParent, "CENTER", -64, 5)
+                end
+                _G.D32AngelFrame:Show()
+            end
+            if _G.D32DemonFrame and _G.healthOrb then
+                -- Store original position relative to healthOrb
+                local point, relativeTo, relativePoint, xOfs, yOfs = _G.D32DemonFrame:GetPoint()
+                -- Reparent to UIParent
+                _G.D32DemonFrame:SetParent(UIParent)
+                _G.D32DemonFrame:ClearAllPoints()
+                -- Ensure frame strata and level are preserved (HIGH strata, level 10 - above orbs but below toggles)
+                _G.D32DemonFrame:SetFrameStrata("MEDIUM")
+                _G.D32DemonFrame:SetFrameLevel(3)
+                -- Get absolute position
+                local absX, absY = _G.healthOrb:GetCenter()
+                if absX and absY then
+                    _G.D32DemonFrame:SetPoint("CENTER", UIParent, "BOTTOMLEFT", absX + 44, absY + 5)
+                else
+                    _G.D32DemonFrame:SetPoint("CENTER", UIParent, "CENTER", 50, 5)
+                end
+                _G.D32DemonFrame:Show()
+            end
+        else
+            -- Hide angel/demon when orbs are hidden and not in state 4
+            if _G.D32AngelFrame then _G.D32AngelFrame:Hide() end
+            if _G.D32DemonFrame then _G.D32DemonFrame:Hide() end
+        end
+        -- Target frame stays in its normal position when orbs are hidden
+        -- Restore party frames to normal position when orbs are hidden
+        -- Only restore if "Reposition Unitframes" is not active
+        if unitframes_state ~= 1 then
+            if _G.UpdatePartyFramePositions then
+                _G.UpdatePartyFramePositions()
+            end
+        end
+        -- Show player frame when orbs are hidden
+        if _G.handlePlayerFrame then
+            _G.handlePlayerFrame(true)
+        elseif PlayerFrame then
+            if PlayerFrame_OnEvent then
+                PlayerFrame:SetScript("OnEvent", PlayerFrame_OnEvent)
+            end
+            PlayerFrame:Show()
+        end
+        -- Hide custom Diablo target frame and show default
+        if _G.HideDiabloTargetFrame then
+            _G.HideDiabloTargetFrame()
+        end
+    end
+end
+
+-- Diablo Orbs toggle checkbox - same line as reload button, under Toggle Gryphons
+local button13 = CreateCheckbox(tooltipFrame, 'DrakeishUI_Toggle13', 'Toggle Diablo Orbs', -175, -120, function(self)
+    local checked = self:GetChecked()
+    
+    if checked then
+        -- Disable Reposition Unitframes checkbox to prevent conflicts
+        if button11 then
+            button11:Disable()
+            button11:SetAlpha(0.5)
+        end
+        -- Enable Toggle Pet Orb checkbox when Diablo Orbs are active
+        -- Access button14 by name since it's defined after this callback
+        local petOrbButton = button14 or _G.DrakeishUI_Toggle14
+        if petOrbButton then
+            petOrbButton:Enable()
+            petOrbButton:SetAlpha(1.0)
+            petOrbButton:EnableMouse(true)
+        end
+    else
+        -- Re-enable Reposition Unitframes checkbox
+        if button11 then
+            button11:Enable()
+            button11:SetAlpha(1.0)
+            -- Force the button to be clickable again
+            button11:EnableMouse(true)
+        end
+        -- Disable and grey out Toggle Pet Orb checkbox when Diablo Orbs are inactive
+        -- Access button14 by name since it's defined after this callback
+        local petOrbButton = button14 or _G.DrakeishUI_Toggle14
+        if petOrbButton then
+            petOrbButton:Disable()
+            petOrbButton:SetAlpha(0.5)
+            petOrbButton:EnableMouse(false)
+        end
+    end
+    
+    diablo_orbs_state = checked and 1 or 0
+    -- print("diablo_orbs_state saved as:", diablo_orbs_state) -- Debug line
+    ToggleDiabloOrbs(checked)
+end)
+
 -- Reload button positioned in middle column under Quest Frame
 local reloadButton = CreateFrame('Button', 'DrakeishUI_ReloadButton', tooltipFrame, 'UIPanelButtonTemplate')
 reloadButton:SetSize(80, 22)
@@ -718,8 +1154,30 @@ reloadButton:SetScript('OnLeave', function(self)
 end)
 reloadButton:SetAlpha(0.8)
 
+-- Toggle Pet Orb checkbox - same row as Reload button, aligned under Choose Gryphon Style
+local button14 = CreateCheckbox(tooltipFrame, 'DrakeishUI_Toggle14', 'Toggle Pet Orb', 125, -120, function(self)
+    local checked = self:GetChecked()
+    
+    if checked then
+        if _G.petOrb then
+            RegisterUnitWatch(_G.petOrb)
+            if _G.D32CharacterData then
+                _G.D32CharacterData.petOrb.enabled = true
+            end
+        end
+    else
+        if _G.petOrb then
+            UnregisterUnitWatch(_G.petOrb)
+            _G.petOrb:Hide()
+            if _G.D32CharacterData then
+                _G.D32CharacterData.petOrb.enabled = false
+            end
+        end
+    end
+end)
+
 -- Store buttons in table
-toggleButtons = {button1, button2, button3, button4, button5, button6, button7, button8, button9, button10, button11}
+toggleButtons = {button1, button2, button3, button4, button5, button6, button7, button8, button9, button10, button11, button13}
 
 -- Main button click handler
 mainToggleButton:SetScript('OnClick', function(self)
@@ -861,9 +1319,13 @@ initFrame:SetScript('OnEvent', function(self, event)
     else
         button3:SetChecked(false) -- Stance bars should be visible by default
     end
-    -- Always use the saved state variable for consistency (invert the logic)
-    if not caps_state then caps_state = 0 end
-    button4:SetChecked(caps_state == 0) -- Invert: when caps_state = 0 (visible), checkbox should be unchecked
+    -- Always use the saved state variable for consistency
+    -- caps_state = 1 means gryphons visible, caps_state = 0 means gryphons hidden
+    if not caps_state then caps_state = 1 end  -- Default to visible (1) when no variables saved
+    button4:SetChecked(caps_state == 1) -- When caps_state = 1 (visible), checkbox should be checked
+    -- Initialize Diablo Orbs state
+    if not diablo_orbs_state then diablo_orbs_state = 0 end
+    button13:SetChecked(diablo_orbs_state == 1)
     -- Initialize bottom bars state display
     if not bottombars_state then bottombars_state = 0 end
     UpdateBottomBarsDisplay()
@@ -879,12 +1341,7 @@ initFrame:SetScript('OnEvent', function(self, event)
     
     -- Initialize buff frame state (inverted display logic: visible = unchecked, hidden = checked)
     if not buffs_state then 
-        -- Check if buff frames are currently visible to set initial state
-        if BuffFrame:IsShown() then
-            buffs_state = 1  -- Visible = unchecked (inverted display)
-        else
-            buffs_state = 0  -- Hidden = checked (inverted display)
-        end
+        buffs_state = 1  -- Default to visible (1) when no variables saved
     end
     
     -- Inverted display logic: when buffs_state = 1 (visible), checkbox should be unchecked (false)
@@ -908,6 +1365,48 @@ initFrame:SetScript('OnEvent', function(self, event)
     if not unitframes_state then unitframes_state = 0 end
     button11:SetChecked(unitframes_state == 1)
     
+    -- Initialize Toggle Pet Orb state
+    if button14 then
+        if _G.D32CharacterData and _G.D32CharacterData.petOrb then
+            button14:SetChecked(_G.D32CharacterData.petOrb.enabled == true)
+            -- Apply pet orb state
+            if _G.petOrb then
+                if _G.D32CharacterData.petOrb.enabled then
+                    RegisterUnitWatch(_G.petOrb)
+                else
+                    UnregisterUnitWatch(_G.petOrb)
+                    _G.petOrb:Hide()
+                end
+            end
+        else
+            -- Default to checked if D32CharacterData not available yet
+            button14:SetChecked(true)
+        end
+        
+        -- Enable/disable Toggle Pet Orb based on Diablo Orbs state
+        if diablo_orbs_state == 1 then
+            -- Diablo Orbs are active, enable the checkbox
+            button14:Enable()
+            button14:SetAlpha(1.0)
+            button14:EnableMouse(true)
+        else
+            -- Diablo Orbs are inactive, disable and grey out the checkbox
+            button14:Disable()
+            button14:SetAlpha(0.5)
+            button14:EnableMouse(false)
+        end
+    end
+    
+    -- Handle mutual exclusion between Reposition Unitframes and Diablo Orbs
+    if unitframes_state == 1 and button13 then
+        -- Disable Diablo Orbs if Reposition Unitframes is active
+        button13:Disable()
+        button13:SetAlpha(0.5)
+    elseif diablo_orbs_state == 1 and button11 then
+        -- Disable Reposition Unitframes if Diablo Orbs is active
+        button11:Disable()
+        button11:SetAlpha(0.5)
+    end
     
     -- Store original positions on first login (before any modifications)
     if not originalPositions.player then
@@ -948,6 +1447,19 @@ initFrame:SetScript('OnEvent', function(self, event)
     -- Update button position based on initial micromenu state
     UpdateButtonPosition()
     
+    -- Hook into bagstoggle button to update main toggle position when clicked
+    if _G.bagstoggle then
+        local originalOnClick = _G.bagstoggle:GetScript('OnClick')
+        _G.bagstoggle:SetScript('OnClick', function(self, ...)
+            if originalOnClick then
+                originalOnClick(self, ...)
+            end
+            -- Update main toggle position immediately after bagstoggle state changes
+            -- bags_state is updated synchronously in the original handler, so we can check it immediately
+            UpdateButtonPosition()
+        end)
+    end
+    
     -- Apply the saved state on login
     if hide_toggle_buttons == 1 then
         -- Hide all main toggle buttons
@@ -978,16 +1490,192 @@ initFrame:SetScript('OnEvent', function(self, event)
     end
 end)
 
+-- Function to immediately hide orbs if they should be hidden (called before timer)
+local function HideOrbsImmediatelyIfNeeded()
+    if not diablo_orbs_state then diablo_orbs_state = 0 end
+    if diablo_orbs_state == 0 then
+        -- Hide immediately if state says they should be hidden
+        if _G.D32_HealthOrb then _G.D32_HealthOrb:Hide() end
+        if _G.D32_ManaOrb then _G.D32_ManaOrb:Hide() end
+        if _G.D32_PetOrb then _G.D32_PetOrb:Hide() end
+        if _G.healthOrb then
+            _G.healthOrb:SetScript("OnUpdate", nil)
+        end
+        if _G.manaOrb then
+            _G.manaOrb:SetScript("OnUpdate", nil)
+        end
+        return true -- Return true if we hid them
+    end
+    return false
+end
+
+-- Hook into orb Show methods to prevent showing if they should be hidden
+local function HookOrbShowMethods()
+    if _G.D32_HealthOrb and not _G.D32_HealthOrb.hookedByDrakeishUI then
+        local originalShow = _G.D32_HealthOrb.Show
+        _G.D32_HealthOrb.originalShow = originalShow -- Store for bypass
+        _G.D32_HealthOrb.Show = function(self, ...)
+            if not diablo_orbs_state or diablo_orbs_state == 0 then
+                return -- Don't show if state says hidden
+            end
+            originalShow(self, ...)
+        end
+        _G.D32_HealthOrb.hookedByDrakeishUI = true
+    end
+    if _G.D32_ManaOrb and not _G.D32_ManaOrb.hookedByDrakeishUI then
+        local originalShow = _G.D32_ManaOrb.Show
+        _G.D32_ManaOrb.originalShow = originalShow -- Store for bypass
+        _G.D32_ManaOrb.Show = function(self, ...)
+            if not diablo_orbs_state or diablo_orbs_state == 0 then
+                return -- Don't show if state says hidden
+            end
+            originalShow(self, ...)
+        end
+        _G.D32_ManaOrb.hookedByDrakeishUI = true
+    end
+    if _G.D32_PetOrb and not _G.D32_PetOrb.hookedByDrakeishUI then
+        local originalShow = _G.D32_PetOrb.Show
+        _G.D32_PetOrb.originalShow = originalShow -- Store for bypass
+        _G.D32_PetOrb.Show = function(self, ...)
+            if not diablo_orbs_state or diablo_orbs_state == 0 then
+                return -- Don't show if state says hidden
+            end
+            originalShow(self, ...)
+        end
+        _G.D32_PetOrb.hookedByDrakeishUI = true
+    end
+end
+
+-- Hook into orb creation to hide immediately if needed
+local orbHideFrame = CreateFrame("Frame")
+orbHideFrame:RegisterEvent("ADDON_LOADED")
+orbHideFrame:SetScript("OnEvent", function(self, event, arg1)
+    if arg1 == "DrakeishUI" or arg1 == "MistrasDiabloOrbs" then
+        -- Try to hide immediately, then keep checking
+        local checkTimer = CreateFrame("Frame")
+        local checkCount = 0
+        checkTimer:SetScript("OnUpdate", function(self, delta)
+            self.elapsed = (self.elapsed or 0) + delta
+            if self.elapsed >= 0.01 then -- Check every 0.01 seconds
+                checkCount = checkCount + 1
+                HookOrbShowMethods() -- Hook Show methods to prevent showing
+                HideOrbsImmediatelyIfNeeded() -- Hide if visible
+                -- Stop checking after 1 second (100 checks) or if orbs are found and handled
+                if checkCount >= 100 or (_G.D32_HealthOrb and diablo_orbs_state == 0 and not _G.D32_HealthOrb:IsShown()) then
+                    self:SetScript("OnUpdate", nil)
+                end
+                self.elapsed = 0
+            end
+        end)
+    end
+end)
+
 -- Add PLAYER_LOGIN event to restore gryphon style state (same pattern as bottombarstoggle.lua)
 local gryphonRestoreFrame = CreateFrame('Frame')
 gryphonRestoreFrame:RegisterEvent('PLAYER_LOGIN')
-gryphonRestoreFrame:SetScript('OnEvent', function(self, event)
-    self:UnregisterEvent(event)
-    if not gryphon_style_state then gryphon_style_state = 1 end
-    
-    -- Apply the restored state immediately
-    ApplyGryphonStyle(gryphon_style_state)
-    UpdateGryphonStyleDisplay()
+gryphonRestoreFrame:RegisterEvent('ADDON_LOADED')
+gryphonRestoreFrame:SetScript('OnEvent', function(self, event, arg1)
+    if event == 'ADDON_LOADED' and arg1 == 'DrakeishUI' then
+        -- Wait a bit for MistrasDiabloOrbs to initialize
+        local timer = CreateFrame("Frame")
+        timer:SetScript("OnUpdate", function(self, delta)
+            self.elapsed = (self.elapsed or 0) + delta
+            if self.elapsed >= 0.5 then
+                if not gryphon_style_state then gryphon_style_state = 1 end
+                ApplyGryphonStyle(gryphon_style_state)
+                UpdateGryphonStyleDisplay()
+                
+                -- Restore Diablo Orbs state
+                if not diablo_orbs_state then diablo_orbs_state = 0 end
+                if button13 then
+                    button13:SetChecked(diablo_orbs_state == 1)
+                end
+                ToggleDiabloOrbs(diablo_orbs_state == 1)
+                
+                -- Restore Toggle Pet Orb state
+                if button14 then
+                    if _G.D32CharacterData and _G.D32CharacterData.petOrb then
+                        button14:SetChecked(_G.D32CharacterData.petOrb.enabled == true)
+                        if _G.petOrb then
+                            if _G.D32CharacterData.petOrb.enabled then
+                                RegisterUnitWatch(_G.petOrb)
+                            else
+                                UnregisterUnitWatch(_G.petOrb)
+                                _G.petOrb:Hide()
+                            end
+                        end
+                    else
+                        button14:SetChecked(true)
+                    end
+                    
+                    -- Enable/disable Toggle Pet Orb based on Diablo Orbs state
+                    if diablo_orbs_state == 1 then
+                        button14:Enable()
+                        button14:SetAlpha(1.0)
+                        button14:EnableMouse(true)
+                    else
+                        button14:Disable()
+                        button14:SetAlpha(0.5)
+                        button14:EnableMouse(false)
+                    end
+                end
+                
+                self:SetScript("OnUpdate", nil)
+            end
+        end)
+    elseif event == 'PLAYER_LOGIN' then
+        self:UnregisterEvent(event)
+        if not gryphon_style_state then gryphon_style_state = 1 end
+        
+        -- Apply the restored state immediately
+        ApplyGryphonStyle(gryphon_style_state)
+        UpdateGryphonStyleDisplay()
+        
+        -- Restore Diablo Orbs state
+        if not diablo_orbs_state then diablo_orbs_state = 0 end
+        if button13 then
+            button13:SetChecked(diablo_orbs_state == 1)
+        end
+        -- Hide immediately if needed, then wait for full initialization
+        HideOrbsImmediatelyIfNeeded()
+        -- Wait a bit for orbs to be fully initialized before showing
+        local timer = CreateFrame("Frame")
+        timer:SetScript("OnUpdate", function(self, delta)
+            self.elapsed = (self.elapsed or 0) + delta
+            if self.elapsed >= 0.5 then
+                ToggleDiabloOrbs(diablo_orbs_state == 1)
+                self:SetScript("OnUpdate", nil)
+            end
+        end)
+        
+        -- Restore Toggle Pet Orb state
+        if button14 then
+            if _G.D32CharacterData and _G.D32CharacterData.petOrb then
+                button14:SetChecked(_G.D32CharacterData.petOrb.enabled == true)
+                if _G.petOrb then
+                    if _G.D32CharacterData.petOrb.enabled then
+                        RegisterUnitWatch(_G.petOrb)
+                    else
+                        UnregisterUnitWatch(_G.petOrb)
+                        _G.petOrb:Hide()
+                    end
+                end
+            else
+                button14:SetChecked(true)
+            end
+            
+            -- Enable/disable Toggle Pet Orb based on Diablo Orbs state
+            if diablo_orbs_state == 1 then
+                button14:Enable()
+                button14:SetAlpha(1.0)
+                button14:EnableMouse(true)
+            else
+                button14:Disable()
+                button14:SetAlpha(0.5)
+                button14:EnableMouse(false)
+            end
+        end
+    end
 end)
 
 -- Add PLAYER_ENTERING_WORLD event to reapply gryphon style after reloads

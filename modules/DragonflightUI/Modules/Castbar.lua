@@ -488,7 +488,18 @@ function Module.ChangeDefaultCastbar()
         
         -- Move the entire bar 20px to the left (15px + 5px)
         TargetFrameSpellBar:ClearAllPoints()
-        TargetFrameSpellBar:SetPoint('TOPLEFT', TargetFrame, 'BOTTOMLEFT', 25 - 20, -23)
+        TargetFrameSpellBar:SetPoint('TOPLEFT', TargetFrame, 'BOTTOMLEFT', 25 - 20, 22)
+        
+        -- Hook OnShow to reapply our position when castbar shows (prevents Blizzard from overwriting)
+        local originalOnShow = TargetFrameSpellBar:GetScript('OnShow')
+        TargetFrameSpellBar:SetScript('OnShow', function(self)
+            if originalOnShow then
+                originalOnShow(self)
+            end
+            -- Reapply our custom position after Blizzard's code runs
+            self:ClearAllPoints()
+            self:SetPoint('TOPLEFT', TargetFrame, 'BOTTOMLEFT', 25 - 20, 22)
+        end)
         
         -- Create background texture (grey texture under the filling one)
         local bgTex = TargetFrameSpellBar:CreateTexture('TargetCastbarBackground', 'BACKGROUND')

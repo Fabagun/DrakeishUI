@@ -18,7 +18,11 @@
 	<Script file="id.lua"/>
 	<Script file="bottombarstoggle.lua"/>
 	<Script file="petbar.lua"/>
+	<!-- Darken UI files disabled - functionality removed, checkbox repurposed for Pet Orb toggle -->
+	<!-- <Script file="darkenUI_config.lua"/> -->
+	<!-- <Script file="darkenUI.lua"/> -->
 	<Script file="UItoggles.lua"/>
+	<Script file="diabloTargetFrame.lua"/>
 	<Include file="SetXpBar.xml"/>
 	<Script file="SetXpBar.lua"/>
 	<Include file="Combuctor\Combuctor\embeds.xml"/>
@@ -44,6 +48,8 @@
 	<Script file="buttonsrange.lua"/>
 	<Script file="DragonflightUI\Modules\petglow.lua"/>
 	<Script file="DragonflightUI\Modules\partyglow.lua"/>
+	<Include file="MistrasDiabloOrbs\MistrasDiabloOrbs.xml"/>
+	<Include file="MistrasDiabloOrbs\MD32MiniMapButton.xml"/>
 	<Include file="Bindings.xml"/>
 	<Script file="BlizzMove.lua"/>
 	<Include file="zzzMoPItemTooltips\embeds.xml"/>
