@@ -2,9 +2,9 @@
 
 ![DrakeishUI](DrakeishUI.png)
 
-![DrakeishUI Screenshot 2](DrakeishUI_2.png)
+![DrakeishUI Screenshot 2](DrakeishUI_2.png?v=2)
 
-![DrakeishUI Screenshot 3](DrakeishUI_2a.png)
+![DrakeishUI Screenshot 2a](DrakeishUI_2a.png?v=2)
 
 ## Description
 
@@ -137,6 +137,9 @@ See [CHANGELOG.md](CHANGELOG.md) for a detailed list of recent changes and updat
 This addon is built upon the work of many talented developers:
 
 - **DragonflightUI**: Yuritsuki
+- **DragonUI**: NeticSoul
+- **DragonUI New Era**: DragonUI_NewEra team
+- **Classic API**: Tsoukie
 - **Bagster/BagSort**: DragonUI (NeticSoul)
 - **Loss of Control Alerts**: RomanSpector & Blizzard
 - **Cromulent**: phyber (Cartographer_ZoneInfo: ckknight)
