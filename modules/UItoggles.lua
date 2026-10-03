@@ -128,7 +128,7 @@ tooltipFrame:SetBackdrop({
 })
 tooltipFrame:SetBackdropColor(0, 0, 0, 0.9)
 tooltipFrame:SetWidth(500)
-tooltipFrame:SetHeight(230) -- Extra row under Diablo Orbs / Reload / Pet Orb
+tooltipFrame:SetHeight(255) -- Extra row under the nameplate line for Reload
 tooltipFrame:SetPoint("CENTER", UIParent, "CENTER")
 tooltipFrame:Hide()
 tooltipFrame:SetFrameStrata("DIALOG")
@@ -1207,10 +1207,70 @@ local button13 = CreateCheckbox(tooltipFrame, 'DrakeishUI_Toggle13', 'Toggle Dia
     end
 end)
 
--- Reload button, middle column, under the Placeholder checkbox
+-- Change Orbs animation sits where Reload was. Click cycles the swirl.
+local ORB_ANIMATIONS = {
+    'orb_rotation_galaxy',
+    'orb_rotation_bubbles',
+    'orb_rotation_iris',
+    'orb_rotation_new_',
+    'orb_rotation_new1_',
+    'orb_rotation_new2_',
+    'orb_rotation_new3_',
+    'orb_rotation_new4_',
+    'orb_rotation_new5_',
+}
+
+local function CurrentOrbAnimation()
+    local data = _G.D32CharacterData
+    local rot = data and data.healthOrb and data.healthOrb.textures and data.healthOrb.textures.rotation
+    for i, name in ipairs(ORB_ANIMATIONS) do
+        if rot == name then return i end
+    end
+    return 2
+end
+
+local function ApplyOrbAnimation(index)
+    local name = ORB_ANIMATIONS[index]
+    if not name then return end
+    local data = _G.D32CharacterData
+    if data and data.healthOrb and data.healthOrb.textures then
+        data.healthOrb.textures.rotation = name
+    end
+    if data and data.manaOrb and data.manaOrb.textures then
+        data.manaOrb.textures.rotation = name
+    end
+    if _G.UpdateOrbTextures then
+        _G.UpdateOrbTextures()
+    end
+end
+
+local button21 = CreateCheckbox(tooltipFrame, 'DrakeishUI_Toggle21', 'Change Orbs animation', -25, -165, function()
+    local index = CurrentOrbAnimation() + 1
+    if index > #ORB_ANIMATIONS then index = 1 end
+    ApplyOrbAnimation(index)
+end)
+
+local orbAnimationText = button21:CreateFontString(nil, 'OVERLAY')
+orbAnimationText:SetFont('Fonts\\FRIZQT__.TTF', 10, 'OUTLINE')
+orbAnimationText:SetTextColor(1, 1, 0, 1)
+orbAnimationText:SetPoint('CENTER', button21, 'CENTER', 0, 0)
+button21:SetCheckedTexture(nil)
+
+local function UpdateOrbAnimationDisplay()
+    orbAnimationText:SetText(tostring(CurrentOrbAnimation()))
+end
+
+local originalOrbAnimationClick = button21:GetScript('OnClick')
+button21:SetScript('OnClick', function(self)
+    originalOrbAnimationClick(self)
+    UpdateOrbAnimationDisplay()
+end)
+UpdateOrbAnimationDisplay()
+
+-- Reload button, middle of the row under the nameplates
 local reloadButton = CreateFrame('Button', 'DrakeishUI_ReloadButton', tooltipFrame, 'UIPanelButtonTemplate')
 reloadButton:SetSize(80, 22)
-reloadButton:SetPoint('TOPLEFT', tooltipTitle, 'BOTTOMLEFT', 10, -165)
+reloadButton:SetPoint('TOPLEFT', tooltipTitle, 'BOTTOMLEFT', 10, -190)
 reloadButton:SetFrameStrata('DIALOG')
 reloadButton:SetFrameLevel(tooltipFrame:GetFrameLevel() + 20)
 reloadButton:SetText('Reload')
@@ -1660,7 +1720,7 @@ raidToggleEventFrame:SetScript("OnEvent", function()
 end)
 
 -- Store buttons in table
-toggleButtons = {button1, button2, button3, button4, button5, button6, button7, button8, button9, button10, button11, button13, button15, button16, button17, button18, button19, button20}
+toggleButtons = {button1, button2, button3, button4, button5, button6, button7, button8, button9, button10, button11, button13, button15, button16, button17, button18, button19, button20, button21}
 
 -- Main button click handler
 mainToggleButton:SetScript('OnClick', function(self)
@@ -1671,6 +1731,7 @@ mainToggleButton:SetScript('OnClick', function(self)
         SyncNameplatesCheckbox()
         SyncRotateMinimapCheckbox()
         UpdateNameplateModeDisplay()
+        UpdateOrbAnimationDisplay()
         tooltipFrame:Show()
         SetMainToggleState('pushed')
     end
@@ -1805,6 +1866,7 @@ initFrame:SetScript('OnEvent', function(self, event)
     HookBlizzardRotateMinimap()
     SyncRotateMinimapCheckbox()
     UpdateNameplateModeDisplay()
+    UpdateOrbAnimationDisplay()
 
     -- Initialize Toggle Pet Frame / Pet Orb row
     if not hide_pet_frame_state then hide_pet_frame_state = 0 end

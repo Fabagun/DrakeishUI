@@ -604,6 +604,17 @@ local function classBackgroundNick() return T.BackgroundNick(T.DEFAULT_BACKGROUN
 -- vignette is what kept the clouds/dust from hard-clipping at the panel edges); masking is dead on
 -- 3.3.5a, so the entire ambient FX layer is DROPPED. The static spec background (f.bg) remains.
 
+-- Same circular class badge the spellbook portrait uses (assets/Spellbook classicon sheet).
+function T.ApplyClassPortrait(unit)
+  local p = T.frame and T.frame.portrait
+  if not p then return end
+  local _, classFile = UnitClass(unit or "player")
+  classFile = classFile and classFile:lower() or "warrior"
+  if not (NE.tex and NE.tex.SetAtlas and NE.tex.SetAtlas(p, "classicon-" .. classFile, false)) then
+    if SetPortraitTexture then pcall(SetPortraitTexture, p, unit or "player") end
+  end
+end
+
 -- ----------------------------------------------------------------------------
 -- Build the STANDALONE window ONCE. Mirrors the spellbook's buildWindow (modules/spellbook/
 -- Window.lua): bare CreateFrame on UIParent, NE.chrome.Apply portrait-frame chrome, a content-root
@@ -680,12 +691,12 @@ local function buildWindow()
     if NE.portrait and NE.portrait.ApplyCutout then
       NE.portrait.ApplyCutout(f.portrait, f)
     end
-    -- A talent-ish placeholder icon; Behavior.Populate may swap to the dominant spec icon.
-    f.portrait:SetTexture("Interface\\Icons\\Ability_Marksmanship")
+    -- Same circular class badge the spellbook uses (classicon-<class>).
+    if T.ApplyClassPortrait then T.ApplyClassPortrait("player") end
     f:HookScript("OnShow", function()
-      if f.portrait and not f.portrait:GetTexture() then
-        f.portrait:SetTexture("Interface\\Icons\\Ability_Marksmanship")
-      end
+      if T.PetViewActive and T.PetViewActive() then return end
+      local unit = (T.IsInspecting and T.IsInspecting() and T._inspectUnit) or "player"
+      if T.ApplyClassPortrait then T.ApplyClassPortrait(unit) end
     end)
   end)
 
@@ -882,7 +893,7 @@ function T.ClearInspect()
   T._inspectUnit = nil
   if not f then return end
   if NE.chrome and NE.chrome.SetTitle then NE.chrome.SetTitle(f, TALENTS or "Talents") end
-  if f.portrait then f.portrait:SetTexture("Interface\\Icons\\Ability_Marksmanship") end
+  if T.ApplyClassPortrait then T.ApplyClassPortrait("player") end
 end
 
 function T.OpenGlyphTab()

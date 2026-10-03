@@ -974,17 +974,9 @@ function T.Populate()
   if f.portrait then
     if isPet then
       ensurePetPortrait(f)
-    else
-      -- WHOSE class: the inspected unit's when there is one. Hard-coding "player" here is what left
-      -- an inspected Death Knight's talents wearing the viewer's own class icon.
-      local _, classFile = UnitClass((inspect and T._inspectUnit) or "player")
-      local c = classFile and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[classFile]
-      if c then
-        f.portrait:SetTexture("Interface\\TargetingFrame\\UI-Classes-Circles")
-        f.portrait:SetTexCoord(c[1], c[2], c[3], c[4])
-      elseif domIcon then
-        f.portrait:SetTexCoord(0, 1, 0, 1); f.portrait:SetTexture(domIcon)
-      end
+    elseif T.ApplyClassPortrait then
+      -- Same circular class badge as the spellbook. Inspect wears that unit's class.
+      T.ApplyClassPortrait((inspect and T._inspectUnit) or "player")
     end
   end
 

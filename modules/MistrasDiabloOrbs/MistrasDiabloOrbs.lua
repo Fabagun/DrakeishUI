@@ -227,10 +227,29 @@ D32CharacterData = defaultsTable
 D32Textures = defaultTextures
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+-- SetPortraitTexture is dropped while PlayerFrame is hidden, and it is not
+-- filled again until a load event. Reapply it whenever the frame comes back.
+local function RefreshPlayerPortrait()
+	if PlayerPortrait and SetPortraitTexture then
+		SetPortraitTexture(PlayerPortrait, "player")
+	end
+end
+
+if PlayerFrame and not PlayerFrame._drakeishPortraitRefresh then
+	PlayerFrame._drakeishPortraitRefresh = true
+	PlayerFrame:HookScript("OnShow", function()
+		RefreshPlayerPortrait()
+		if C_Timer and C_Timer.After then
+			C_Timer.After(0, RefreshPlayerPortrait)
+		end
+	end)
+end
+
 function handlePlayerFrame(show)
 	if show then
 		PlayerFrame:SetScript("OnEvent",PlayerFrame_OnEvent)
 		PlayerFrame:Show()
+		RefreshPlayerPortrait()
 	else
 		PlayerFrame:SetScript("OnEvent",nil)
 		PlayerFrame:Hide()
@@ -1558,6 +1577,7 @@ local function UpdateOrbTextures()
 	manaOrb.galaxy2.texture:SetTexture(images..D32CharacterData.manaOrb.textures.rotation.."2.tga")
 	manaOrb.galaxy3.texture:SetTexture(images..D32CharacterData.manaOrb.textures.rotation.."3.tga")
 end
+_G.UpdateOrbTextures = UpdateOrbTextures
 
 function D32ApplyChanges()
 	local activeElement = CommitButton.activeElement
