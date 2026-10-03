@@ -75,8 +75,18 @@ local function SetupWatchFrame()
 
         -- Optional: Add title text
         local bannerText = bannerFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        bannerText:SetPoint("CENTER", bannerFrame, "CENTER", 0, 0)
+        bannerText:SetPoint("CENTER", bannerFrame, "CENTER", -6, 0)
         bannerText:SetText("World Objectives")
+        bannerFrame.Title = bannerText
+    end
+
+    -- Keep the quest tracker toggle on the same line as "World Objectives"
+    if _G.watchframetoggle and WatchFrameBanner then
+        _G.watchframetoggle:ClearAllPoints()
+        _G.watchframetoggle:SetPoint("RIGHT", WatchFrameBanner, "RIGHT", 0, 0)
+        _G.watchframetoggle:SetParent(UIParent)
+        _G.watchframetoggle:SetFrameStrata(WatchFrameBanner:GetFrameStrata())
+        _G.watchframetoggle:SetFrameLevel(WatchFrameBanner:GetFrameLevel() + 2)
     end
 end
 
@@ -90,7 +100,8 @@ local questToggleButton
 do
 	questToggleButton = CreateFrame('CheckButton', 'watchframetoggle', UIParent)
 	questToggleButton:SetSize(10, 14)
-	questToggleButton:SetPoint("LEFT", UIParent, "RIGHT", -12, 295)
+	-- Final anchor is applied in SetupWatchFrame() next to "World Objectives"
+	questToggleButton:SetPoint("RIGHT", UIParent, "RIGHT", -12, 0)
 	questToggleButton:SetAlpha(0.3)
 	questToggleButton:SetNormalTexture''
 	questToggleButton:SetPushedTexture''

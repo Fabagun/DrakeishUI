@@ -1,4 +1,4 @@
-﻿-- BlizzMmove, move the blizzard frames by yess
+-- BlizzMmove, move the blizzard frames by yess
 db = nil
 local frame = CreateFrame("Frame")
 local optionPanel = nil
@@ -204,10 +204,62 @@ local function OnEvent()
 		SetMoveHandler(CharacterFrame,SkillFrame)
 		SetMoveHandler(CharacterFrame,ReputationFrame)
 		SetMoveHandler(CharacterFrame,PetPaperDollFrameCompanionFrame)
+		-- Custom Pet/Honor panes are created by the character panel; wire now and again on show
+		-- in case builders have not run yet when PEW fires.
+		local function EnsureCharacterPanelMoveHandlers()
+			if not CharacterFrame then return end
+
+			-- Pet/Honor fill CharacterFrame and their higher-level content consumes the body.
+			-- Their old handlers also excluded the top 28px, leaving no reachable drag surface.
+			-- Give those tabs a title-only handle, below the close button but above their panes.
+			local dragHandle = _G.DrakeishUICharacterMoveHandle
+			if not dragHandle then
+				dragHandle = CreateFrame("Frame", "DrakeishUICharacterMoveHandle", CharacterFrame)
+				dragHandle:SetPoint("TOPLEFT", CharacterFrame, "TOPLEFT", 8, -4)
+				dragHandle:SetPoint("TOPRIGHT", CharacterFrame, "TOPRIGHT", -32, -4)
+				dragHandle:SetHeight(24)
+				dragHandle:SetFrameLevel(CharacterFrame:GetFrameLevel() + 50)
+				dragHandle:EnableMouse(true)
+				dragHandle:Hide()
+				SetMoveHandler(CharacterFrame, dragHandle)
+			end
+
+			local function wirePane(pane)
+				if not pane or pane._blizzMoveWired then return end
+				pane._blizzMoveWired = true
+				pane:HookScript("OnShow", function()
+					dragHandle:SetFrameLevel(CharacterFrame:GetFrameLevel() + 50)
+					dragHandle:Show()
+				end)
+				pane:HookScript("OnHide", function()
+					if not (DrakeishUIPetFrame and DrakeishUIPetFrame:IsShown())
+						and not (DrakeishUIHonorFrame and DrakeishUIHonorFrame:IsShown()) then
+						dragHandle:Hide()
+					end
+				end)
+				if pane:IsShown() then dragHandle:Show() end
+			end
+
+			wirePane(DrakeishUIPetFrame)
+			wirePane(DrakeishUIHonorFrame)
+
+			-- Keep the X above those panes even after tab switches raise subframe levels.
+			local cb = CharacterFrameCloseButton
+			if cb then
+				cb:SetFrameLevel(CharacterFrame:GetFrameLevel() + 60)
+			end
+		end
+		EnsureCharacterPanelMoveHandlers()
+		if CharacterFrame and not CharacterFrame._blizzMovePetHonorHook then
+			CharacterFrame._blizzMovePetHonorHook = true
+			CharacterFrame:HookScript("OnShow", EnsureCharacterPanelMoveHandlers)
+		end
 		SetMoveHandler(SpellBookFrame)
 		SetMoveHandler(QuestLogFrame)
 		SetMoveHandler(FriendsFrame)
 		SetMoveHandler(PVPParentFrame)
+		SetMoveHandler(DrakeishUI_Social_PVPFrame)
+		SetMoveHandler(DrakeishUI_ChatCopyFrame, DrakeishUI_ChatCopyFrame and DrakeishUI_ChatCopyFrame._neTitleBand)
 		SetMoveHandler(LFGParentFrame)
 		SetMoveHandler(GameMenuFrame)
 		SetMoveHandler(GossipFrame)
@@ -249,7 +301,12 @@ local function OnEvent()
 	elseif arg1 == "Blizzard_MacroUI" then
 		SetMoveHandler(MacroFrame)
 	elseif arg1 == "Blizzard_AchievementUI" then
-		SetMoveHandler(AchievementFrame, AchievementFrameHeader)
+		-- Prefer the modern title-band handle from DrakeishUI achievements skin when present.
+		local achHandle = _G.DrakeishUIAchievementMoveHandle or AchievementFrameHeader
+		SetMoveHandler(AchievementFrame, achHandle)
+		if AchievementFrameHeader then
+			AchievementFrameHeader:EnableMouse(true)
+		end
 	elseif arg1 == "Blizzard_TalentUI" then
 		SetMoveHandler(PlayerTalentFrame)
 	elseif arg1 == "Blizzard_Calendar" then
@@ -274,6 +331,9 @@ frame:RegisterEvent("PLAYER_ENTERING_WORLD")
 --              that has UIParent as Parent or nil  
 ----------------------------------------------------------
 BlizzMove = {}
+function BlizzMove:Register(frameToMove, handler)
+	SetMoveHandler(frameToMove, handler)
+end
 function BlizzMove:Toggle(handler)
 	if not handler then
 		handler = GetMouseFocus()

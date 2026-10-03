@@ -14,7 +14,22 @@
 	<Script file="chatcopy.lua"/>
 	<Script file="minimapbuttons.lua"/>
 	<Script file="buffs.lua"/>
+	<!-- Pets & Mounts (Collections): microbutton must exist before micromenu captures its list. -->
+	<Script file="bagster_bridge.lua"/>
+	<Script file="worldmap_support.lua"/>
+	<Script file="worldmap_scrollbar.lua"/>
+	<!-- Character Panel (C): full listpane/reveal; load before collections so list APIs are complete. -->
+	<Include file="characterpanel\characterpanel.xml"/>
+	<Script file="itemlevel.lua"/>
+	<Script file="companion_traits.lua"/>
+	<Include file="collections\collections.xml"/>
 	<Script file="micromenu.lua"/>
+	<Include file="social\social.xml"/>
+	<!-- War-Within spellbook. Loads after social so DrakeishUI_SocialNE chrome exists. -->
+	<Include file="spellbook\spellbook.xml"/>
+	<!-- Retail-style talent window. After the spellbook so the shared talent sheet is registered. -->
+	<Include file="talents\talents.xml"/>
+	<Include file="encounterjournal\encounterjournal.xml"/>
 	<Script file="id.lua"/>
 	<Script file="bottombarstoggle.lua"/>
 	<Script file="petbar.lua"/>
@@ -22,12 +37,16 @@
 	<!-- <Script file="darkenUI_config.lua"/> -->
 	<!-- <Script file="darkenUI.lua"/> -->
 	<Script file="UItoggles.lua"/>
+	<Script file="raidframes.lua"/>
 	<Script file="diabloTargetFrame.lua"/>
 	<Include file="SetXpBar.xml"/>
 	<Script file="SetXpBar.lua"/>
-	<Include file="Combuctor\Combuctor\embeds.xml"/>
-    <Include file="Combuctor\Combuctor\load.xml"/>
-    <Script file="Combuctor\Combuctor_Sets\sets.lua"/>
+	<!-- Bagster — LibStub/LibItemSearch load from DrakeishUI.toc -->
+	<Script file="bags_usability.lua"/>
+	<Include file="bagster\bagster.xml"/>
+	<Script file="bagsort.lua"/>
+	<!-- Retail-style World Map (M) from DragonUI -->
+	<Include file="worldmap\worldmap.xml"/>
 	<Script file="DragonflightUI\Libs\LibStub\LibStub.lua"/>
     <Include file="DragonflightUI\Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml"/>
 	<Include file="DragonflightUI\Libs\AceAddon-3.0\AceAddon-3.0.xml"/>

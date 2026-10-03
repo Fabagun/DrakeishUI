@@ -1,5 +1,9 @@
-﻿<Bindings>
+<Bindings>
 	<Binding name="MOVEFRAME" header="BLIZZMOVE">
 		BlizzMove:Toggle()
+	</Binding>
+	<!-- BINDING_NAME_* set in modules/collections/microbutton.lua -->
+	<Binding name="DRAKEISHUI_TOGGLE_COLLECTIONS" header="DRAKEISHUI">
+		if DrakeishUI_ToggleCollections then DrakeishUI_ToggleCollections() end
 	</Binding>
 </Bindings>

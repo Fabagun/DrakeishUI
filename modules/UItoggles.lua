@@ -6,10 +6,16 @@ local UIParent = UIParent;
 local hooksecurefunc = hooksecurefunc;
 local _G = _G;
 
--- Main toggle button to the left of CharacterMicroButton
+-- Main toggle button to the left of CharacterMicroButton.
+-- The micro menu is scaled, so match that on-screen size (14x19 at scale_menu)
+-- and leave the same 1px gap the other buttons use.
+local menuScale = (config.micromenu and config.micromenu.scale_menu) or 1.4
+local microW, microH = 14 * menuScale, 19 * menuScale
+local microGap = menuScale
+
 local mainToggleButton = CreateFrame('Button', 'DrakeishUI_MainToggle', UIParent)
-mainToggleButton:SetSize(28, 26) -- Reduced by 20% again (35 * 0.8 = 28)
-mainToggleButton:SetPoint('RIGHT', CharacterMicroButton, 'LEFT', 2, 1.5)
+mainToggleButton:SetSize(microW, microH)
+mainToggleButton:SetPoint('RIGHT', CharacterMicroButton, 'LEFT', -microGap, 0)
 mainToggleButton:SetFrameStrata('TOOLTIP')
 mainToggleButton:SetFrameLevel(1000)
 
@@ -57,41 +63,58 @@ end
 local function UpdateButtonPosition()
     -- Check if micromenu is hidden (bags_state == 1 means micromenu is hidden)
     if bags_state == 1 then
-        -- Move to HelpMicroButton position when micromenu is hidden
+        -- Sit on the game menu button, hidden until the cursor is over it.
         mainToggleButton:ClearAllPoints()
-        mainToggleButton:SetPoint('BOTTOMRIGHT', HelpMicroButton, 'BOTTOMRIGHT', 0, 0)
-        -- Enable mouseover when micromenu is hidden
+        mainToggleButton:SetPoint('CENTER', MainMenuMicroButton, 'CENTER', 0, 0)
         enableMouseOver(mainToggleButton, true)
     else
         -- Move to original position when micromenu is visible
         mainToggleButton:ClearAllPoints()
-        mainToggleButton:SetPoint('RIGHT', CharacterMicroButton, 'LEFT', 2, 1.5)
+        mainToggleButton:SetPoint('RIGHT', CharacterMicroButton, 'LEFT', -microGap, 0)
         -- Disable mouseover when micromenu is visible
         enableMouseOver(mainToggleButton, false)
     end
 end
 
--- Button texture
-mainToggleButton:SetNormalTexture('Interface\\AddOns\\DrakeishUI\\assets\\DrakeishUI3.blp')
-mainToggleButton:SetPushedTexture('Interface\\AddOns\\DrakeishUI\\assets\\DrakeishUI-pushed.blp')
-mainToggleButton:SetHighlightTexture('Interface\\AddOns\\DrakeishUI\\assets\\DrakeishUI-highlight3.blp')
+-- uimicromenu2x_add, third row. Columns match the other micro icons:
+-- 4 = normal, 3 = pushed, 2 = highlight.
+local MICRO_ADD = 'Interface\\AddOns\\DrakeishUI\\assets\\uimicromenu2x_add'
+local MICRO_ROW_TOP, MICRO_ROW_BOTTOM = 109/512, 161/512
+local MICRO_COORDS = {
+    normal    = { 121/256, 159/256, MICRO_ROW_TOP, MICRO_ROW_BOTTOM },
+    pushed    = { 81/256,  119/256, MICRO_ROW_TOP, MICRO_ROW_BOTTOM },
+    -- Highlight art is drawn 3px left of the normal art inside its cell.
+    highlight = { 38/256,  76/256,  MICRO_ROW_TOP, MICRO_ROW_BOTTOM },
+}
 
-local normal = mainToggleButton:GetNormalTexture()
-normal:SetAllPoints()
-normal:SetTexCoord(0, 1, 0, 1) -- Full texture (1:1 coordinates)
--- Brighten the normal texture to reduce faded appearance
--- normal:SetVertexColor(2, 2, 2) -- Brighten by 20%
+local function FitButtonTexture(region, coords)
+    if not region then return end
+    region:ClearAllPoints()
+    region:SetAllPoints(mainToggleButton)
+    region:SetTexCoord(coords[1], coords[2], coords[3], coords[4])
+end
 
-local pushed = mainToggleButton:GetPushedTexture()
-pushed:SetAllPoints()
-pushed:SetTexCoord(0, 1, 0, 1) -- Full texture (1:1 coordinates)
+local function ApplyMainToggleAtlas()
+    mainToggleButton:SetNormalTexture(MICRO_ADD)
+    mainToggleButton:SetPushedTexture(MICRO_ADD)
+    mainToggleButton:SetHighlightTexture(MICRO_ADD)
+    FitButtonTexture(mainToggleButton:GetNormalTexture(), MICRO_COORDS.normal)
+    FitButtonTexture(mainToggleButton:GetPushedTexture(), MICRO_COORDS.pushed)
+    local highlightRegion = mainToggleButton:GetHighlightTexture()
+    FitButtonTexture(highlightRegion, MICRO_COORDS.highlight)
+    if highlightRegion then
+        highlightRegion:SetAlpha(1)
+        highlightRegion:SetBlendMode('BLEND')
+    end
+end
 
-local highlight = mainToggleButton:GetHighlightTexture()
-highlight:SetAllPoints()
-highlight:SetTexCoord(0, 1, 0, 1) -- Full texture (1:1 coordinates)
-highlight:SetAlpha(0.6)
--- highlight:SetVertexColor(0.7,0.7,0.7)
-highlight:SetBlendMode('BLEND')
+-- While the settings window is open the button stays on the pushed slice.
+local function SetMainToggleState(state)
+    mainToggleButton:SetNormalTexture(MICRO_ADD)
+    FitButtonTexture(mainToggleButton:GetNormalTexture(), MICRO_COORDS[state])
+end
+
+ApplyMainToggleAtlas()
 
 -- Main toggle window (using same style as chatcopy)
 local tooltipFrame = CreateFrame('Frame', 'DrakeishUI_ToggleTooltip', UIParent)
@@ -105,7 +128,7 @@ tooltipFrame:SetBackdrop({
 })
 tooltipFrame:SetBackdropColor(0, 0, 0, 0.9)
 tooltipFrame:SetWidth(500)
-tooltipFrame:SetHeight(180) -- Reduced from 190 to 180 (-10 pixels)
+tooltipFrame:SetHeight(230) -- Extra row under Diablo Orbs / Reload / Pet Orb
 tooltipFrame:SetPoint("CENTER", UIParent, "CENTER")
 tooltipFrame:Hide()
 tooltipFrame:SetFrameStrata("DIALOG")
@@ -129,7 +152,7 @@ titleBar:SetPoint("TOPRIGHT", tooltipFrame, "TOPRIGHT", 0, 0)
 
 -- Title text
 local titleText = titleBar:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-titleText:SetPoint("CENTER", titleBar, "CENTER", 0, -5)
+titleText:SetPoint("CENTER", titleBar, "CENTER", 0, 2)
 titleText:SetText("DrakeishUI Settings")
 titleText:SetTextColor(1, 0.82, 0) -- Blizzard's standard yellow color
 
@@ -140,8 +163,52 @@ closeButton:SetScript("OnClick", function()
     tooltipFrame:Hide() 
 end)
 
--- Use the titleText from title bar as reference for positioning
-local tooltipTitle = titleText
+-- Same chrome as the other modern windows: metal outer frame, light stone, dark inner well.
+local function SkinSettingsWindow(f)
+    local NE = DrakeishUI_SocialNE
+    local PC = NE and NE.panelchrome
+    if not PC or not PC.Apply or f._neSettingsSkinned then return end
+    if f.SetBackdrop then f:SetBackdrop(nil) end
+    PC.Apply(f, {
+        layout = "ButtonFrameTemplateNoPortrait",
+        noPortrait = true,
+        noCloseButton = true,
+    })
+    if f.Bg then
+        f.Bg:SetVertexColor(1, 1, 1)
+        f.Bg:ClearAllPoints()
+        f.Bg:SetPoint("TOPLEFT", f, "TOPLEFT", 6, -20)
+        f.Bg:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -1, 4)
+    end
+    local well = CreateFrame("Frame", nil, f)
+    well:EnableMouse(false)
+    well:SetPoint("TOPLEFT", f, "TOPLEFT", 12, -32)
+    well:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -10, 8)
+    local bg = well:CreateTexture(nil, "BACKGROUND")
+    bg:SetTexture("Interface\\Buttons\\WHITE8X8")
+    bg:SetVertexColor(0.06, 0.06, 0.07, 0.75)
+    bg:SetAllPoints(well)
+    if NE.nineslice and NE.nineslice.AttachInset then
+        local border = NE.nineslice.AttachInset(well, 0, 0, 0, 0)
+        local base = f:GetFrameLevel() or 1
+        well:SetFrameLevel(base + 2)
+        if border then border:SetFrameLevel(base + 3) end
+    end
+    titleBar:SetFrameLevel((f:GetFrameLevel() or 1) + 12)
+    if PC.ModernizeCloseButton then
+        PC.ModernizeCloseButton(closeButton, { frameLevelBump = 20 })
+    end
+    f._neSettingsSkinned = true
+end
+SkinSettingsWindow(tooltipFrame)
+
+-- Checkbox rows sit 6px below the title so they land inside the dark well.
+-- Title stays on the metal cap; every checkbox line and the Reload button
+-- is anchored to this point.
+local contentAnchor = CreateFrame("Frame", nil, tooltipFrame)
+contentAnchor:SetSize(1, 1)
+contentAnchor:SetPoint("BOTTOMLEFT", titleText, "BOTTOMLEFT", 0, -10)
+local tooltipTitle = contentAnchor
 
 -- Create 10 toggle buttons in 2 columns
 local toggleButtons = {}
@@ -181,6 +248,7 @@ local function CreateCheckbox(parent, name, text, x, y, onClick)
     buttonText:SetTextColor(1, 1, 1, 1)
     buttonText:SetPoint('LEFT', button, 'RIGHT', 5, 0)
     buttonText:SetText(text)
+    button.label = buttonText
     
     -- Set click handler
     button:SetScript('OnClick', onClick)
@@ -239,20 +307,17 @@ local button2 = CreateCheckbox(tooltipFrame, 'DrakeishUI_Toggle2', 'Toggle Chat 
     else
         -- Fallback to simple chat frame toggle
         local checked = self:GetChecked()
-        if checked then
+        chat_state = checked and 1 or 0
+        if _G.DrakeishUI_ApplyChatView then
+            _G.DrakeishUI_ApplyChatView()
+        elseif checked then
             ChatFrame1:Hide()
+            if ChatFrame2 then ChatFrame2:Hide() end
             ChatFrame1EditBox:Hide()
-            if _G.UnifiedInfoFrame then
-                _G.UnifiedInfoFrame:Hide()
-            end
-            chat_state = 1
+            if _G.UnifiedInfoFrame then _G.UnifiedInfoFrame:Hide() end
         else
             ChatFrame1:Show()
-            ChatFrame1EditBox:Show()
-            if _G.UnifiedInfoFrame then
-                _G.UnifiedInfoFrame:Show()
-            end
-            chat_state = 0
+            if _G.UnifiedInfoFrame then _G.UnifiedInfoFrame:Show() end
         end
     end
 end)
@@ -437,6 +502,7 @@ local button10 = CreateCheckbox(tooltipFrame, 'DrakeishUI_Toggle10', 'Hide UI To
         -- Hide all main toggle buttons
         if _G.partytoggle then _G.partytoggle:Hide() end
         if _G.chattoggle then _G.chattoggle:Hide() end
+        if _G.DrakeishUI_ChatViewToggle then _G.DrakeishUI_ChatViewToggle:Hide() end
         if _G.stancetoggle then _G.stancetoggle:Hide() end
         if _G.gryphontoggle then _G.gryphontoggle:Hide() end
         if _G.bottombarstoggle then _G.bottombarstoggle:Hide() end
@@ -451,6 +517,7 @@ local button10 = CreateCheckbox(tooltipFrame, 'DrakeishUI_Toggle10', 'Hide UI To
         -- Show all main toggle buttons
         if _G.partytoggle then _G.partytoggle:Show() end
         if _G.chattoggle then _G.chattoggle:Show() end
+        if _G.DrakeishUI_ChatViewToggle then _G.DrakeishUI_ChatViewToggle:Show() end
         if _G.stancetoggle then _G.stancetoggle:Show() end
         if _G.gryphontoggle then _G.gryphontoggle:Show() end
         if _G.bottombarstoggle then _G.bottombarstoggle:Show() end
@@ -637,9 +704,127 @@ local button11 = CreateCheckbox(tooltipFrame, 'DrakeishUI_Toggle11', 'Reposition
 end)
 
 -- Gryphon style functions
+-- Orbs sit on screen edge (Y=0); keep angel/demon at their pre-move height (+15 vs old offset 5)
+local ANGEL_DEMON_Y = 20
+local GRYPHON_STYLE_MAX = 13 -- 1-3 gryphons, 4 angel/demon, 5-13 End_caps pairs
+local ENDCAP_MEDIA = "Interface\\AddOns\\DrakeishUI\\assets\\End_caps\\"
+local ENDCAP_SIZE = 160
+local ENDCAP_LEFT_X = -64
+local ENDCAP_RIGHT_X = 44
+
+local function EnsureCustomEndCaps()
+    if _G.DrakeishUI_EndCapLeft and _G.DrakeishUI_EndCapRight then
+        return _G.DrakeishUI_EndCapLeft, _G.DrakeishUI_EndCapRight
+    end
+
+    local left = CreateFrame("Frame", "DrakeishUI_EndCapLeft", UIParent)
+    left:SetWidth(ENDCAP_SIZE)
+    left:SetHeight(ENDCAP_SIZE)
+    left:SetFrameStrata("MEDIUM")
+    left:SetFrameLevel(3)
+    left.texture = left:CreateTexture(nil, "OVERLAY")
+    left.texture:SetAllPoints(left)
+    left:Hide()
+
+    local right = CreateFrame("Frame", "DrakeishUI_EndCapRight", UIParent)
+    right:SetWidth(ENDCAP_SIZE)
+    right:SetHeight(ENDCAP_SIZE)
+    right:SetFrameStrata("MEDIUM")
+    right:SetFrameLevel(3)
+    right.texture = right:CreateTexture(nil, "OVERLAY")
+    right.texture:SetAllPoints(right)
+    right:Hide()
+
+    return left, right
+end
+
+local function HideCustomEndCaps()
+    if _G.DrakeishUI_EndCapLeft then _G.DrakeishUI_EndCapLeft:Hide() end
+    if _G.DrakeishUI_EndCapRight then _G.DrakeishUI_EndCapRight:Hide() end
+end
+
+-- Place left/right artwork the same way as angel/demon (orb-anchored)
+local function PlaceOrbSideArtwork(leftFrame, rightFrame)
+    if not leftFrame or not rightFrame then return end
+
+    local orbsShown = _G.D32_HealthOrb and _G.D32_HealthOrb:IsShown()
+        and _G.D32_ManaOrb and _G.D32_ManaOrb:IsShown()
+
+    if orbsShown then
+        if _G.manaOrb then
+            leftFrame:SetParent(_G.manaOrb)
+            leftFrame:ClearAllPoints()
+            leftFrame:SetPoint("CENTER", _G.manaOrb, "CENTER", ENDCAP_LEFT_X, ANGEL_DEMON_Y)
+            leftFrame:SetFrameStrata("MEDIUM")
+            leftFrame:SetFrameLevel(3)
+            leftFrame:Show()
+        end
+        if _G.healthOrb then
+            rightFrame:SetParent(_G.healthOrb)
+            rightFrame:ClearAllPoints()
+            rightFrame:SetPoint("CENTER", _G.healthOrb, "CENTER", ENDCAP_RIGHT_X, ANGEL_DEMON_Y)
+            rightFrame:SetFrameStrata("MEDIUM")
+            rightFrame:SetFrameLevel(3)
+            rightFrame:Show()
+        end
+    else
+        if _G.manaOrb then
+            leftFrame:SetParent(UIParent)
+            leftFrame:ClearAllPoints()
+            leftFrame:SetFrameStrata("MEDIUM")
+            leftFrame:SetFrameLevel(3)
+            local absX, absY = _G.manaOrb:GetCenter()
+            if absX and absY then
+                leftFrame:SetPoint("CENTER", UIParent, "BOTTOMLEFT", absX + ENDCAP_LEFT_X, absY + ANGEL_DEMON_Y)
+            else
+                leftFrame:SetPoint("CENTER", UIParent, "CENTER", ENDCAP_LEFT_X, ANGEL_DEMON_Y)
+            end
+            leftFrame:Show()
+        end
+        if _G.healthOrb then
+            rightFrame:SetParent(UIParent)
+            rightFrame:ClearAllPoints()
+            rightFrame:SetFrameStrata("MEDIUM")
+            rightFrame:SetFrameLevel(3)
+            local absX, absY = _G.healthOrb:GetCenter()
+            if absX and absY then
+                rightFrame:SetPoint("CENTER", UIParent, "BOTTOMLEFT", absX + ENDCAP_RIGHT_X, absY + ANGEL_DEMON_Y)
+            else
+                rightFrame:SetPoint("CENTER", UIParent, "CENTER", ENDCAP_RIGHT_X + 6, ANGEL_DEMON_Y)
+            end
+            rightFrame:Show()
+        end
+    end
+end
+
 function ApplyGryphonStyle(style)
     if not MainMenuBarLeftEndCap or not MainMenuBarRightEndCap then return end
-    
+    style = style or 1
+
+    -- Always clear custom end caps first; angel/demon handled per-style
+    HideCustomEndCaps()
+
+    -- Styles 5-13: End_caps pairs (ecl_N / ecr_N), same size/pos as angel & demon
+    if style >= 5 and style <= 13 then
+        MainMenuBarLeftEndCap:Hide()
+        MainMenuBarRightEndCap:Hide()
+        if _G.D32AngelFrame then _G.D32AngelFrame:Hide() end
+        if _G.D32DemonFrame then _G.D32DemonFrame:Hide() end
+
+        if caps_state == 0 then
+            if D32CharacterData then D32CharacterData.artwork.show = false end
+            return
+        end
+
+        local pair = style - 4 -- 1..9
+        local left, right = EnsureCustomEndCaps()
+        left.texture:SetTexture(ENDCAP_MEDIA .. "ecl_" .. pair)
+        right.texture:SetTexture(ENDCAP_MEDIA .. "ecr_" .. pair)
+        PlaceOrbSideArtwork(left, right)
+        if D32CharacterData then D32CharacterData.artwork.show = true end
+        return
+    end
+
     -- Handle angel/demon state (4)
     if style == 4 then -- angel and demon together
         -- Hide gryphons
@@ -655,59 +840,7 @@ function ApplyGryphonStyle(style)
             return
         end
         
-        -- Show both angel and demon (frames are created as D32AngelFrame and D32DemonFrame)
-        -- Check if orbs are shown or hidden to determine proper parentage
-        local orbsShown = _G.D32_HealthOrb and _G.D32_HealthOrb:IsShown() and _G.D32_ManaOrb and _G.D32_ManaOrb:IsShown()
-        
-        if orbsShown then
-            -- Orbs are shown, reparent angel/demon to orbs
-            if _G.D32AngelFrame and _G.manaOrb then
-                _G.D32AngelFrame:SetParent(_G.manaOrb)
-                _G.D32AngelFrame:ClearAllPoints()
-                _G.D32AngelFrame:SetPoint("CENTER", _G.manaOrb, "CENTER", -64, 5)
-                _G.D32AngelFrame:SetFrameStrata("MEDIUM")
-                _G.D32AngelFrame:SetFrameLevel(3)
-                _G.D32AngelFrame:Show()
-            end
-            if _G.D32DemonFrame and _G.healthOrb then
-                _G.D32DemonFrame:SetParent(_G.healthOrb)
-                _G.D32DemonFrame:ClearAllPoints()
-                _G.D32DemonFrame:SetPoint("CENTER", _G.healthOrb, "CENTER", 44, 5)
-                _G.D32DemonFrame:SetFrameStrata("MEDIUM")
-                _G.D32DemonFrame:SetFrameLevel(3)
-                _G.D32DemonFrame:Show()
-            end
-        else
-            -- Orbs are hidden, reparent angel/demon to UIParent
-            if _G.D32AngelFrame and _G.manaOrb then
-                _G.D32AngelFrame:SetParent(UIParent)
-                _G.D32AngelFrame:ClearAllPoints()
-                _G.D32AngelFrame:SetFrameStrata("MEDIUM")
-                _G.D32AngelFrame:SetFrameLevel(3)
-                -- Get absolute position from manaOrb
-                local absX, absY = _G.manaOrb:GetCenter()
-                if absX and absY then
-                    _G.D32AngelFrame:SetPoint("CENTER", UIParent, "BOTTOMLEFT", absX + (-64), absY + 5)
-                else
-                    _G.D32AngelFrame:SetPoint("CENTER", UIParent, "CENTER", -64, 5)
-                end
-                _G.D32AngelFrame:Show()
-            end
-            if _G.D32DemonFrame and _G.healthOrb then
-                _G.D32DemonFrame:SetParent(UIParent)
-                _G.D32DemonFrame:ClearAllPoints()
-                _G.D32DemonFrame:SetFrameStrata("MEDIUM")
-                _G.D32DemonFrame:SetFrameLevel(3)
-                -- Get absolute position from healthOrb
-                local absX, absY = _G.healthOrb:GetCenter()
-                if absX and absY then
-                    _G.D32DemonFrame:SetPoint("CENTER", UIParent, "BOTTOMLEFT", absX + 44, absY + 5)
-                else
-                    _G.D32DemonFrame:SetPoint("CENTER", UIParent, "CENTER", 50, 5)
-                end
-                _G.D32DemonFrame:Show()
-            end
-        end
+        PlaceOrbSideArtwork(_G.D32AngelFrame, _G.D32DemonFrame)
         -- Update saved state
         if D32CharacterData then D32CharacterData.artwork.show = true end
         return
@@ -725,22 +858,34 @@ function ApplyGryphonStyle(style)
         return
     end
         if style == 1 then -- old
-        MainMenuBarLeftEndCap:SetClearPoint('BOTTOMLEFT', -82, -22)
-        MainMenuBarRightEndCap:SetClearPoint('BOTTOMRIGHT', 84, -22)
+        if addon.SetEndCapBasePoints then
+            addon.SetEndCapBasePoints(-82, 84, -22)
+        else
+            MainMenuBarLeftEndCap:SetClearPoint('BOTTOMLEFT', -82, -22)
+            MainMenuBarRightEndCap:SetClearPoint('BOTTOMRIGHT', 84, -22)
+        end
         MainMenuBarLeftEndCap:set_atlas('ui-hud-actionbar-gryphon-left', true)
         MainMenuBarRightEndCap:set_atlas('ui-hud-actionbar-gryphon-right', true)
         MainMenuBarLeftEndCap:Show()
         MainMenuBarRightEndCap:Show()
     elseif style == 2 then -- new
-        MainMenuBarLeftEndCap:SetClearPoint('BOTTOMLEFT', -95, -23)
-        MainMenuBarRightEndCap:SetClearPoint('BOTTOMRIGHT', 95, -23)
+        if addon.SetEndCapBasePoints then
+            addon.SetEndCapBasePoints(-95, 95, -23)
+        else
+            MainMenuBarLeftEndCap:SetClearPoint('BOTTOMLEFT', -95, -23)
+            MainMenuBarRightEndCap:SetClearPoint('BOTTOMRIGHT', 95, -23)
+        end
         MainMenuBarLeftEndCap:set_atlas('ui-hud-actionbar-gryphon-thick-left', true)
         MainMenuBarRightEndCap:set_atlas('ui-hud-actionbar-wyvern-thick-right', true)
         MainMenuBarLeftEndCap:Show()
         MainMenuBarRightEndCap:Show()
     elseif style == 3 then -- flying
-        MainMenuBarLeftEndCap:SetClearPoint('BOTTOMLEFT', -80, -21)
-        MainMenuBarRightEndCap:SetClearPoint('BOTTOMRIGHT', 80, -21)
+        if addon.SetEndCapBasePoints then
+            addon.SetEndCapBasePoints(-80, 80, -21)
+        else
+            MainMenuBarLeftEndCap:SetClearPoint('BOTTOMLEFT', -80, -21)
+            MainMenuBarRightEndCap:SetClearPoint('BOTTOMRIGHT', 80, -21)
+        end
         MainMenuBarLeftEndCap:set_atlas('ui-hud-actionbar-gryphon-flying-left', true)
         MainMenuBarRightEndCap:set_atlas('ui-hud-actionbar-gryphon-flying-right', true)
         MainMenuBarLeftEndCap:Show()
@@ -754,9 +899,9 @@ end
 
 -- Gryphon style checkbox with number states
 local button12 = CreateCheckbox(tooltipFrame, 'DrakeishUI_Toggle12', 'Choose Gryphon Style', 125, -90, function(self)
-    -- Cycle through states: 1=old, 2=new, 3=flying, 4=angel+demon
+    -- Cycle: 1-3 gryphons, 4 angel+demon, 5-13 End_caps pairs
     gryphon_style_state = (gryphon_style_state or 1) + 1
-    if gryphon_style_state > 4 then
+    if gryphon_style_state > GRYPHON_STYLE_MAX then
         gryphon_style_state = 1
     end
     
@@ -963,35 +1108,7 @@ function ToggleDiabloOrbs(show)
                 _G.checkPetFontPlacement()
             end
         end
-        -- When orbs are shown, restore angel/demon parentage if needed
-        -- If gryphon style is state 4, they should be children of orbs
-        if gryphon_style_state == 4 then
-            -- Reparent angel and demon back to their original parents (manaOrb and healthOrb)
-            -- Ensure frame levels are set correctly so they appear above the orbs
-            if _G.D32AngelFrame and _G.manaOrb then
-                _G.D32AngelFrame:SetParent(_G.manaOrb)
-                _G.D32AngelFrame:ClearAllPoints()
-                _G.D32AngelFrame:SetPoint("CENTER", _G.manaOrb, "CENTER", -64, 5)
-                -- Ensure frame strata and level are correct (HIGH strata, level 10 - above orbs but below toggles)
-                _G.D32AngelFrame:SetFrameStrata("MEDIUM")
-                _G.D32AngelFrame:SetFrameLevel(3)
-                _G.D32AngelFrame:Show()
-            end
-            if _G.D32DemonFrame and _G.healthOrb then
-                _G.D32DemonFrame:SetParent(_G.healthOrb)
-                _G.D32DemonFrame:ClearAllPoints()
-                _G.D32DemonFrame:SetPoint("CENTER", _G.healthOrb, "CENTER", 44, 5)
-                -- Ensure frame strata and level are correct (HIGH strata, level 10 - above orbs but below toggles)
-                _G.D32DemonFrame:SetFrameStrata("MEDIUM")
-                _G.D32DemonFrame:SetFrameLevel(3)
-                _G.D32DemonFrame:Show()
-            end
-        else
-            -- Hide angel/demon when orbs are shown but not in state 4
-            if _G.D32AngelFrame then _G.D32AngelFrame:Hide() end
-            if _G.D32DemonFrame then _G.D32DemonFrame:Hide() end
-        end
-        -- Apply gryphon style to ensure correct state
+        -- When orbs are shown, re-apply gryphon/endcap artwork parenting
         if gryphon_style_state then
             ApplyGryphonStyle(gryphon_style_state)
         end
@@ -1023,50 +1140,9 @@ function ToggleDiabloOrbs(show)
         if _G.manaOrb then
             _G.manaOrb:SetScript("OnUpdate", nil)
         end
-        -- If gryphon style is state 4 (angel + demon), show them even when orbs are hidden
-        -- Angel and demon are children of the orbs, so they get hidden when orbs are hidden
-        -- We need to reparent them to UIParent so they can be shown independently
-        if gryphon_style_state == 4 then
-            if _G.D32AngelFrame and _G.manaOrb then
-                -- Store original position relative to manaOrb
-                local point, relativeTo, relativePoint, xOfs, yOfs = _G.D32AngelFrame:GetPoint()
-                -- Reparent to UIParent
-                _G.D32AngelFrame:SetParent(UIParent)
-                _G.D32AngelFrame:ClearAllPoints()
-                -- Ensure frame strata and level are preserved (HIGH strata, level 10 - above orbs but below toggles)
-                _G.D32AngelFrame:SetFrameStrata("MEDIUM")
-                _G.D32AngelFrame:SetFrameLevel(3)
-                -- Get absolute position
-                local absX, absY = _G.manaOrb:GetCenter()
-                if absX and absY then
-                    _G.D32AngelFrame:SetPoint("CENTER", UIParent, "BOTTOMLEFT", absX + (-64), absY + 5)
-                else
-                    _G.D32AngelFrame:SetPoint("CENTER", UIParent, "CENTER", -64, 5)
-                end
-                _G.D32AngelFrame:Show()
-            end
-            if _G.D32DemonFrame and _G.healthOrb then
-                -- Store original position relative to healthOrb
-                local point, relativeTo, relativePoint, xOfs, yOfs = _G.D32DemonFrame:GetPoint()
-                -- Reparent to UIParent
-                _G.D32DemonFrame:SetParent(UIParent)
-                _G.D32DemonFrame:ClearAllPoints()
-                -- Ensure frame strata and level are preserved (HIGH strata, level 10 - above orbs but below toggles)
-                _G.D32DemonFrame:SetFrameStrata("MEDIUM")
-                _G.D32DemonFrame:SetFrameLevel(3)
-                -- Get absolute position
-                local absX, absY = _G.healthOrb:GetCenter()
-                if absX and absY then
-                    _G.D32DemonFrame:SetPoint("CENTER", UIParent, "BOTTOMLEFT", absX + 44, absY + 5)
-                else
-                    _G.D32DemonFrame:SetPoint("CENTER", UIParent, "CENTER", 50, 5)
-                end
-                _G.D32DemonFrame:Show()
-            end
-        else
-            -- Hide angel/demon when orbs are hidden and not in state 4
-            if _G.D32AngelFrame then _G.D32AngelFrame:Hide() end
-            if _G.D32DemonFrame then _G.D32DemonFrame:Hide() end
+        -- Re-apply gryphon/endcap artwork (reparents angel/demon/endcaps when orbs hide)
+        if gryphon_style_state then
+            ApplyGryphonStyle(gryphon_style_state)
         end
         -- Target frame stays in its normal position when orbs are hidden
         -- Restore party frames to normal position when orbs are hidden
@@ -1090,10 +1166,21 @@ function ToggleDiabloOrbs(show)
             _G.HideDiabloTargetFrame()
         end
     end
+
+    -- Push sidebars out when orbs are active; restore when deactivated
+    if addon.RefreshSidebarPositions then
+        addon.RefreshSidebarPositions(show and true or false)
+    end
+    if _G.RefreshBlizzardPetFrame then
+        _G.RefreshBlizzardPetFrame()
+    end
+    if _G.PlacePlayerClassBars then
+        _G.PlacePlayerClassBars()
+    end
 end
 
--- Diablo Orbs toggle checkbox - same line as reload button, under Toggle Gryphons
-local button13 = CreateCheckbox(tooltipFrame, 'DrakeishUI_Toggle13', 'Toggle Diablo Orbs', -175, -120, function(self)
+-- Diablo Orbs toggle checkbox - bottom row, under Toggle Gryphons
+local button13 = CreateCheckbox(tooltipFrame, 'DrakeishUI_Toggle13', 'Toggle Diablo Orbs', -175, -140, function(self)
     local checked = self:GetChecked()
     
     if checked then
@@ -1101,14 +1188,6 @@ local button13 = CreateCheckbox(tooltipFrame, 'DrakeishUI_Toggle13', 'Toggle Dia
         if button11 then
             button11:Disable()
             button11:SetAlpha(0.5)
-        end
-        -- Enable Toggle Pet Orb checkbox when Diablo Orbs are active
-        -- Access button14 by name since it's defined after this callback
-        local petOrbButton = button14 or _G.DrakeishUI_Toggle14
-        if petOrbButton then
-            petOrbButton:Enable()
-            petOrbButton:SetAlpha(1.0)
-            petOrbButton:EnableMouse(true)
         end
     else
         -- Re-enable Reposition Unitframes checkbox
@@ -1118,25 +1197,20 @@ local button13 = CreateCheckbox(tooltipFrame, 'DrakeishUI_Toggle13', 'Toggle Dia
             -- Force the button to be clickable again
             button11:EnableMouse(true)
         end
-        -- Disable and grey out Toggle Pet Orb checkbox when Diablo Orbs are inactive
-        -- Access button14 by name since it's defined after this callback
-        local petOrbButton = button14 or _G.DrakeishUI_Toggle14
-        if petOrbButton then
-            petOrbButton:Disable()
-            petOrbButton:SetAlpha(0.5)
-            petOrbButton:EnableMouse(false)
-        end
     end
     
     diablo_orbs_state = checked and 1 or 0
     -- print("diablo_orbs_state saved as:", diablo_orbs_state) -- Debug line
     ToggleDiabloOrbs(checked)
+    if UpdatePetOrbPetFrameExclusion then
+        UpdatePetOrbPetFrameExclusion()
+    end
 end)
 
--- Reload button positioned in middle column under Quest Frame
+-- Reload button, middle column, under the Placeholder checkbox
 local reloadButton = CreateFrame('Button', 'DrakeishUI_ReloadButton', tooltipFrame, 'UIPanelButtonTemplate')
 reloadButton:SetSize(80, 22)
-reloadButton:SetPoint('TOPLEFT', tooltipTitle, 'BOTTOMLEFT', 10, -120)
+reloadButton:SetPoint('TOPLEFT', tooltipTitle, 'BOTTOMLEFT', 10, -165)
 reloadButton:SetFrameStrata('DIALOG')
 reloadButton:SetFrameLevel(tooltipFrame:GetFrameLevel() + 20)
 reloadButton:SetText('Reload')
@@ -1154,11 +1228,16 @@ reloadButton:SetScript('OnLeave', function(self)
 end)
 reloadButton:SetAlpha(0.8)
 
--- Toggle Pet Orb checkbox - same row as Reload button, aligned under Choose Gryphon Style
-local button14 = CreateCheckbox(tooltipFrame, 'DrakeishUI_Toggle14', 'Toggle Pet Orb', 125, -120, function(self)
+-- Toggle Pet Orb checkbox - bottom row, aligned under Choose Gryphon Style
+local button14 = CreateCheckbox(tooltipFrame, 'DrakeishUI_Toggle14', 'Toggle Pet Orb', 125, -140, function(self)
     local checked = self:GetChecked()
     
     if checked then
+        -- Pet Orb on → clear / disable Toggle Pet Frame
+        hide_pet_frame_state = 0
+        if button17 then
+            button17:SetChecked(false)
+        end
         if _G.petOrb then
             RegisterUnitWatch(_G.petOrb)
             if _G.D32CharacterData then
@@ -1174,29 +1253,426 @@ local button14 = CreateCheckbox(tooltipFrame, 'DrakeishUI_Toggle14', 'Toggle Pet
             end
         end
     end
+    if UpdatePetOrbPetFrameExclusion then
+        UpdatePetOrbPetFrameExclusion()
+    end
+    if _G.DrakeishUI_UpdateRaidFrames then
+        _G.DrakeishUI_UpdateRaidFrames()
+    end
+    if _G.RefreshBlizzardPetFrame then
+        _G.RefreshBlizzardPetFrame()
+    end
+end)
+
+-- Raid frames preference helpers.
+-- darken_ui_state is an unused legacy SavedVariable already in the TOC; dual-write
+-- so the preference persists even if raid_frames_state is not yet in the client's SV list.
+function DrakeishUI_GetRaidFramesState()
+    if raid_frames_state == 1 or darken_ui_state == 1 then
+        return 1
+    end
+    if raid_frames_state == 0 or darken_ui_state == 0 then
+        return 0
+    end
+    return 0
+end
+_G.DrakeishUI_GetRaidFramesState = DrakeishUI_GetRaidFramesState
+
+function DrakeishUI_SetRaidFramesState(value)
+    local v = (value == 1 or value == true) and 1 or 0
+    raid_frames_state = v
+    darken_ui_state = v
+    _G.raid_frames_state = v
+    _G.darken_ui_state = v
+end
+_G.DrakeishUI_SetRaidFramesState = DrakeishUI_SetRaidFramesState
+
+-- raid_frame_style_state is new in the TOC, so this client will not write it
+-- until a full restart. DrakeishUI_SocialDB is already saved; keep the style there.
+function DrakeishUI_GetRaidFrameStyle()
+    DrakeishUI_SocialDB = DrakeishUI_SocialDB or {}
+    local style = tonumber(DrakeishUI_SocialDB.raidFrameStyle)
+    if style ~= 1 and style ~= 2 then
+        style = tonumber(raid_frame_style_state) or 1
+    end
+    if style ~= 2 then style = 1 end
+    return style
+end
+_G.DrakeishUI_GetRaidFrameStyle = DrakeishUI_GetRaidFrameStyle
+
+function DrakeishUI_SetRaidFrameStyle(style)
+    style = (tonumber(style) == 2) and 2 or 1
+    raid_frame_style_state = style
+    _G.raid_frame_style_state = style
+    DrakeishUI_SocialDB = DrakeishUI_SocialDB or {}
+    DrakeishUI_SocialDB.raidFrameStyle = style
+end
+_G.DrakeishUI_SetRaidFrameStyle = DrakeishUI_SetRaidFrameStyle
+
+function UpdateRaidFramesToggleAvailability()
+    local btn = _G.DrakeishUI_Toggle15
+    if not btn then return end
+
+    local state = DrakeishUI_GetRaidFramesState()
+    btn:SetChecked(state == 1)
+
+    local inRaid = (GetNumRaidMembers() or 0) > 0
+    if inRaid then
+        btn:Enable()
+        btn:SetAlpha(1.0)
+        btn:EnableMouse(true)
+        if btn.label then
+            btn.label:SetTextColor(1, 1, 1, 1)
+        end
+    else
+        btn:Disable()
+        btn:SetAlpha(0.5)
+        btn:EnableMouse(false)
+        if btn.label then
+            btn.label:SetTextColor(0.5, 0.5, 0.5, 1)
+        end
+    end
+end
+_G.UpdateRaidFramesToggleAvailability = UpdateRaidFramesToggleAvailability
+
+-- New row above the last line (3 columns): Raid Frames + Placeholder + Toggle Pet Frame
+local button15 = CreateCheckbox(tooltipFrame, 'DrakeishUI_Toggle15', 'Toggle Raid Frames', -175, -115, function(self)
+    if InCombatLockdown and InCombatLockdown() then
+        self:SetChecked(not self:GetChecked())
+        UIErrorsFrame:AddMessage("Cannot toggle raid frames while in combat!", 1.0, 1.0, 0.0, 1.0)
+        return
+    end
+    -- Only usable while actually in a raid
+    if (GetNumRaidMembers() or 0) == 0 then
+        self:SetChecked(not self:GetChecked())
+        return
+    end
+    local checked = self:GetChecked()
+    if DrakeishUI_SetRaidFramesState then
+        DrakeishUI_SetRaidFramesState(checked and 1 or 0)
+    else
+        raid_frames_state = checked and 1 or 0
+        darken_ui_state = raid_frames_state -- legacy unused SV slot (guaranteed to persist)
+    end
+    if _G.DrakeishUI_UpdateRaidFrames then
+        _G.DrakeishUI_UpdateRaidFrames()
+    end
+    if _G.DrakeishUI_RefreshPartyFrames then
+        _G.DrakeishUI_RefreshPartyFrames()
+    end
+    if UpdateRaidFramesToggleAvailability then
+        UpdateRaidFramesToggleAvailability()
+    end
+end)
+local button16 = CreateCheckbox(tooltipFrame, 'DrakeishUI_Toggle16', 'Choose Raid Frames', -25, -115, function(self)
+    if InCombatLockdown and InCombatLockdown() then
+        UIErrorsFrame:AddMessage("Cannot change raid frames while in combat!", 1.0, 1.0, 0.0, 1.0)
+        return
+    end
+    -- 1 = current frames, 2 = half height, names only, thin border
+    local style = DrakeishUI_GetRaidFrameStyle() + 1
+    if style > 2 then style = 1 end
+    DrakeishUI_SetRaidFrameStyle(style)
+    if _G.DrakeishUI_UpdateRaidFrames then
+        _G.DrakeishUI_UpdateRaidFrames()
+    end
+end)
+
+local raidFrameStyleText = button16:CreateFontString(nil, 'OVERLAY')
+raidFrameStyleText:SetFont('Fonts\\FRIZQT__.TTF', 10, 'OUTLINE')
+raidFrameStyleText:SetTextColor(1, 1, 0, 1)
+raidFrameStyleText:SetPoint('CENTER', button16, 'CENTER', 0, 0)
+button16:SetCheckedTexture(nil)
+
+local function UpdateRaidFrameStyleDisplay()
+    local style = DrakeishUI_GetRaidFrameStyle()
+    DrakeishUI_SetRaidFrameStyle(style)
+    raidFrameStyleText:SetText(tostring(style))
+end
+
+local originalRaidStyleClick = button16:GetScript('OnClick')
+button16:SetScript('OnClick', function(self)
+    originalRaidStyleClick(self)
+    UpdateRaidFrameStyleDisplay()
+end)
+
+local button17 = CreateCheckbox(tooltipFrame, 'DrakeishUI_Toggle17', 'Toggle Pet Frame', 125, -115, function(self)
+    local checked = self:GetChecked()
+    hide_pet_frame_state = checked and 1 or 0
+
+    if checked then
+        -- Hide standard pet frame → turn off pet orb and grey it out
+        if _G.petOrb then
+            UnregisterUnitWatch(_G.petOrb)
+            _G.petOrb:Hide()
+        end
+        if _G.D32CharacterData and _G.D32CharacterData.petOrb then
+            _G.D32CharacterData.petOrb.enabled = false
+        end
+        if button14 then
+            button14:SetChecked(false)
+        end
+    end
+
+    if UpdatePetOrbPetFrameExclusion then
+        UpdatePetOrbPetFrameExclusion()
+    end
+    if _G.DrakeishUI_UpdateRaidFrames then
+        _G.DrakeishUI_UpdateRaidFrames()
+    end
+    if _G.RefreshBlizzardPetFrame then
+        _G.RefreshBlizzardPetFrame()
+    end
+end)
+
+-- Enemy is Ctrl+V, friendly is Shift+V. Neutral is its own CVar when the
+-- client has one; otherwise neutrals follow the enemy toggle.
+-- A plain set to 1 does not create plates. The value has to change 0 -> 1.
+local NAMEPLATE_CVARS = { "nameplateShowEnemies", "nameplateShowFriends", "nameplateShowNeutral" }
+
+local function NameplateCVarExists(cvar)
+    return GetCVar(cvar) ~= nil
+end
+
+local function NameplatesShown()
+    local any = false
+    for i = 1, #NAMEPLATE_CVARS do
+        local cvar = NAMEPLATE_CVARS[i]
+        if NameplateCVarExists(cvar) then
+            any = true
+            if GetCVar(cvar) ~= "1" then
+                return false
+            end
+        end
+    end
+    return any
+end
+
+local function SyncNameplatesCheckbox()
+    local box = _G.DrakeishUI_Toggle18
+    if box then
+        box:SetChecked(NameplatesShown())
+    end
+end
+
+local function PulseNameplateCVar(cvar, shown)
+    if not NameplateCVarExists(cvar) then
+        return
+    end
+    if not shown then
+        SetCVar(cvar, 0)
+        return
+    end
+    SetCVar(cvar, 0)
+    SetCVar(cvar, abs(GetCVar(cvar) - 1))
+end
+
+local function ApplyNameplateCVars(shown)
+    for i = 1, #NAMEPLATE_CVARS do
+        PulseNameplateCVar(NAMEPLATE_CVARS[i], shown)
+    end
+end
+
+local function SetNameplatesShown(shown)
+    if tooltipFrame then
+        tooltipFrame:SetScript("OnUpdate", nil)
+    end
+    ApplyNameplateCVars(shown)
+    if not shown or not tooltipFrame then
+        return
+    end
+    -- Apply again next frame. The client drops the enable if it lands in the
+    -- same update as the disable.
+    tooltipFrame:SetScript("OnUpdate", function(self)
+        self:SetScript("OnUpdate", nil)
+        ApplyNameplateCVars(true)
+    end)
+end
+
+-- 1 = selected unit only, 2 = that layout on every unit, 3 = Blizzard plates.
+local NAMEPLATE_MODE_MAX = 3
+
+local function DrakeishUI_GetNameplateMode()
+    DrakeishUI_SocialDB = DrakeishUI_SocialDB or {}
+    local mode = tonumber(DrakeishUI_SocialDB.nameplateMode) or 1
+    if mode < 1 or mode > NAMEPLATE_MODE_MAX then
+        mode = 1
+    end
+    return mode
+end
+
+local function DrakeishUI_SetNameplateMode(mode)
+    mode = tonumber(mode) or 1
+    if mode < 1 or mode > NAMEPLATE_MODE_MAX then
+        mode = 1
+    end
+    DrakeishUI_SocialDB = DrakeishUI_SocialDB or {}
+    DrakeishUI_SocialDB.nameplateMode = mode
+    _G.DrakeishUI_NameplateMode = mode
+    if _G.KuiNameplates and _G.KuiNameplates.ApplyDrakeishNameplateMode then
+        _G.KuiNameplates:ApplyDrakeishNameplateMode()
+    end
+end
+
+_G.DrakeishUI_GetNameplateMode = DrakeishUI_GetNameplateMode
+_G.DrakeishUI_SetNameplateMode = DrakeishUI_SetNameplateMode
+
+local button19
+
+local function MinimapRotationEnabled()
+    return GetCVar("rotateMinimap") == "1"
+end
+
+local function HideStockNorthTag()
+    if MinimapNorthTag then
+        MinimapNorthTag:Hide()
+        MinimapNorthTag:SetAlpha(0)
+    end
+end
+
+local function SyncRotateMinimapCheckbox()
+    button19:SetChecked(MinimapRotationEnabled())
+end
+
+local function ApplyMinimapRotation(enabled)
+    SetCVar("rotateMinimap", enabled and "1" or "0")
+    if type(Minimap_UpdateRotationSetting) == "function" then
+        Minimap_UpdateRotationSetting()
+    end
+    HideStockNorthTag()
+    local blizz = _G.InterfaceOptionsDisplayPanelRotateMinimap
+    if blizz then
+        blizz:SetChecked(enabled and true or false)
+    end
+    SyncRotateMinimapCheckbox()
+end
+
+local function HookBlizzardRotateMinimap()
+    if type(Minimap_UpdateRotationSetting) == "function" and not _G.DrakeishUI_RotateMinimapWrapped then
+        local original = Minimap_UpdateRotationSetting
+        Minimap_UpdateRotationSetting = function(...)
+            original(...)
+            HideStockNorthTag()
+        end
+        _G.DrakeishUI_RotateMinimapWrapped = true
+    end
+    local blizz = _G.InterfaceOptionsDisplayPanelRotateMinimap
+    if not blizz or blizz._drakeishRotateHook then
+        return
+    end
+    blizz._drakeishRotateHook = true
+    blizz:HookScript("OnClick", function()
+        SyncRotateMinimapCheckbox()
+    end)
+end
+
+local button18 = CreateCheckbox(tooltipFrame, 'DrakeishUI_Toggle18', 'Show Nameplates', -175, -165, function(self)
+    SetNameplatesShown(self:GetChecked())
+end)
+button19 = CreateCheckbox(tooltipFrame, 'DrakeishUI_Toggle19', 'Rotate minimap', -25, -140, function(self)
+    ApplyMinimapRotation(self:GetChecked())
+end)
+HookBlizzardRotateMinimap()
+local button20 = CreateCheckbox(tooltipFrame, 'DrakeishUI_Toggle20', 'Choose nameplates', 125, -165, function()
+    local mode = DrakeishUI_GetNameplateMode() + 1
+    if mode > NAMEPLATE_MODE_MAX then
+        mode = 1
+    end
+    DrakeishUI_SetNameplateMode(mode)
+end)
+
+local nameplateModeText = button20:CreateFontString(nil, 'OVERLAY')
+nameplateModeText:SetFont('Fonts\\FRIZQT__.TTF', 10, 'OUTLINE')
+nameplateModeText:SetTextColor(1, 1, 0, 1)
+nameplateModeText:SetPoint('CENTER', button20, 'CENTER', 0, 0)
+button20:SetCheckedTexture(nil)
+
+local function UpdateNameplateModeDisplay()
+    local mode = DrakeishUI_GetNameplateMode()
+    DrakeishUI_SetNameplateMode(mode)
+    nameplateModeText:SetText(tostring(mode))
+end
+
+local originalNameplateModeClick = button20:GetScript('OnClick')
+button20:SetScript('OnClick', function(self)
+    originalNameplateModeClick(self)
+    UpdateNameplateModeDisplay()
+end)
+
+-- Mutual exclusion: Pet Orb <-> Toggle Pet Frame (grey out the other)
+function UpdatePetOrbPetFrameExclusion()
+    local petOrbBtn = button14 or _G.DrakeishUI_Toggle14
+    local petFrameBtn = button17 or _G.DrakeishUI_Toggle17
+    if not petOrbBtn or not petFrameBtn then return end
+
+    local orbsActive = (diablo_orbs_state == 1)
+    local petOrbOn = orbsActive
+        and _G.D32CharacterData
+        and _G.D32CharacterData.petOrb
+        and _G.D32CharacterData.petOrb.enabled
+    local hidePet = (hide_pet_frame_state or 0) == 1
+
+    -- Pet Frame checkbox
+    if petOrbOn then
+        petFrameBtn:SetChecked(false)
+        hide_pet_frame_state = 0
+        petFrameBtn:Disable()
+        petFrameBtn:SetAlpha(0.5)
+        petFrameBtn:EnableMouse(false)
+    else
+        petFrameBtn:Enable()
+        petFrameBtn:SetAlpha(1.0)
+        petFrameBtn:EnableMouse(true)
+        petFrameBtn:SetChecked(hidePet)
+    end
+
+    -- Pet Orb checkbox (also requires Diablo Orbs)
+    if hidePet or not orbsActive then
+        petOrbBtn:Disable()
+        petOrbBtn:SetAlpha(0.5)
+        petOrbBtn:EnableMouse(false)
+        if hidePet then
+            petOrbBtn:SetChecked(false)
+        end
+    else
+        petOrbBtn:Enable()
+        petOrbBtn:SetAlpha(1.0)
+        petOrbBtn:EnableMouse(true)
+    end
+end
+_G.UpdatePetOrbPetFrameExclusion = UpdatePetOrbPetFrameExclusion
+
+-- Apply initial raid-toggle availability (greyed when not in a raid)
+if UpdateRaidFramesToggleAvailability then
+    UpdateRaidFramesToggleAvailability()
+end
+
+-- Keep raid checkbox enabled/greyed in sync with roster
+local raidToggleEventFrame = CreateFrame("Frame")
+raidToggleEventFrame:RegisterEvent("PLAYER_LOGIN")
+raidToggleEventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+raidToggleEventFrame:RegisterEvent("RAID_ROSTER_UPDATE")
+raidToggleEventFrame:RegisterEvent("PARTY_MEMBERS_CHANGED")
+raidToggleEventFrame:SetScript("OnEvent", function()
+    if UpdateRaidFramesToggleAvailability then
+        UpdateRaidFramesToggleAvailability()
+    end
 end)
 
 -- Store buttons in table
-toggleButtons = {button1, button2, button3, button4, button5, button6, button7, button8, button9, button10, button11, button13}
+toggleButtons = {button1, button2, button3, button4, button5, button6, button7, button8, button9, button10, button11, button13, button15, button16, button17, button18, button19, button20}
 
 -- Main button click handler
 mainToggleButton:SetScript('OnClick', function(self)
     if tooltipFrame:IsShown() then
         tooltipFrame:Hide()
-        -- Change to closed state (normal texture)
-        normal:SetTexCoord(0, 1, 0, 1)
-        pushed:SetTexCoord(0, 1, 0, 1)
-        highlight:SetTexCoord(0, 1, 0, 1)
-        -- Restore normal texture when window is closed
-        mainToggleButton:SetNormalTexture('Interface\\AddOns\\DrakeishUI\\assets\\DrakeishUI3.blp')
+        SetMainToggleState('normal')
     else
+        SyncNameplatesCheckbox()
+        SyncRotateMinimapCheckbox()
+        UpdateNameplateModeDisplay()
         tooltipFrame:Show()
-        -- Change to open state (pushed texture)
-        normal:SetTexCoord(0, 1, 0, 1)
-        pushed:SetTexCoord(0, 1, 0, 1)
-        highlight:SetTexCoord(0, 1, 0, 1)
-        -- Force the pushed texture to be visible when window is open
-        mainToggleButton:SetNormalTexture('Interface\\AddOns\\DrakeishUI\\assets\\DrakeishUI-pushed.blp')
+        SetMainToggleState('pushed')
     end
 end)
 
@@ -1219,16 +1695,7 @@ end)
 local function HideTooltipOnClick()
     if tooltipFrame:IsShown() then
         tooltipFrame:Hide()
-        -- Change to closed state (normal texture)
-        local normal = mainToggleButton:GetNormalTexture()
-        local pushed = mainToggleButton:GetPushedTexture()
-        local highlight = mainToggleButton:GetHighlightTexture()
-        
-        normal:SetTexCoord(0, 1, 0, 1)
-        pushed:SetTexCoord(0, 1, 0, 1)
-        highlight:SetTexCoord(0, 1, 0, 1)
-        -- Restore normal texture when window is closed
-        mainToggleButton:SetNormalTexture('Interface\\AddOns\\DrakeishUI\\assets\\DrakeishUI3.blp')
+        SetMainToggleState('normal')
     end
 end
 
@@ -1239,19 +1706,10 @@ UIParent:SetScript('OnMouseDown', HideTooltipOnClick)
 
 -- Hook into tooltip show/hide events
 tooltipFrame:HookScript('OnShow', function()
-    -- Set pushed texture when tooltip is shown
-    mainToggleButton:SetNormalTexture('Interface\\AddOns\\DrakeishUI\\assets\\DrakeishUI-pushed.blp')
+    SetMainToggleState('pushed')
 end)
 tooltipFrame:HookScript('OnHide', function()
-    -- Reset to normal texture when tooltip is hidden
-    mainToggleButton:SetNormalTexture('Interface\\AddOns\\DrakeishUI\\assets\\DrakeishUI3.blp')
-    local normal = mainToggleButton:GetNormalTexture()
-    local pushed = mainToggleButton:GetPushedTexture()
-    local highlight = mainToggleButton:GetHighlightTexture()
-    
-    normal:SetTexCoord(0, 1, 0, 1)
-    pushed:SetTexCoord(0, 1, 0, 1)
-    highlight:SetTexCoord(0, 1, 0, 1)
+    SetMainToggleState('normal')
 end)
 
 -- Make tooltip movable but don't capture keyboard events
@@ -1272,37 +1730,15 @@ end)
 mainToggleButton:SetAlpha(0.7)
 
 -- Ensure main button is in proper initial state after reload
-mainToggleButton:SetNormalTexture('Interface\\AddOns\\DrakeishUI\\assets\\DrakeishUI3.blp')
-mainToggleButton:SetPushedTexture('Interface\\AddOns\\DrakeishUI\\assets\\DrakeishUI-pushed.blp')
-mainToggleButton:SetHighlightTexture('Interface\\AddOns\\DrakeishUI\\assets\\DrakeishUI-highlight3.blp')
-
--- Reset texture coordinates to normal state
-local normal = mainToggleButton:GetNormalTexture()
-local pushed = mainToggleButton:GetPushedTexture()
-local highlight = mainToggleButton:GetHighlightTexture()
-
-normal:SetTexCoord(0, 1, 0, 1)
-pushed:SetTexCoord(0, 1, 0, 1)
-highlight:SetTexCoord(0, 1, 0, 1)
-
--- Ensure highlight texture is properly configured
-highlight:SetAlpha(0.6)
-highlight:SetBlendMode('BLEND')
+ApplyMainToggleAtlas()
 
 -- Initialize button states on login
 local initFrame = CreateFrame('Frame')
 initFrame:RegisterEvent('PLAYER_LOGIN')
 initFrame:SetScript('OnEvent', function(self, event)
     -- Reset main button to normal state after reload
-    mainToggleButton:SetNormalTexture('Interface\\AddOns\\DrakeishUI\\assets\\DrakeishUI3.blp')
-    local normal = mainToggleButton:GetNormalTexture()
-    local pushed = mainToggleButton:GetPushedTexture()
-    local highlight = mainToggleButton:GetHighlightTexture()
-    
-    normal:SetTexCoord(0, 1, 0, 1)
-    pushed:SetTexCoord(0, 1, 0, 1)
-    highlight:SetTexCoord(0, 1, 0, 1)
-    
+    ApplyMainToggleAtlas()
+
     -- Ensure tooltip is hidden on login
     tooltipFrame:Hide()
     
@@ -1365,36 +1801,54 @@ initFrame:SetScript('OnEvent', function(self, event)
     if not unitframes_state then unitframes_state = 0 end
     button11:SetChecked(unitframes_state == 1)
     
+    SyncNameplatesCheckbox()
+    HookBlizzardRotateMinimap()
+    SyncRotateMinimapCheckbox()
+    UpdateNameplateModeDisplay()
+
+    -- Initialize Toggle Pet Frame / Pet Orb row
+    if not hide_pet_frame_state then hide_pet_frame_state = 0 end
+    if button17 then
+        button17:SetChecked(hide_pet_frame_state == 1)
+    end
+
+    -- Initialize Toggle Raid Frames
+    DrakeishUI_SetRaidFramesState(DrakeishUI_GetRaidFramesState())
+    if UpdateRaidFramesToggleAvailability then
+        UpdateRaidFramesToggleAvailability()
+    end
+    if _G.DrakeishUI_UpdateRaidFrames then
+        _G.DrakeishUI_UpdateRaidFrames()
+    end
+
     -- Initialize Toggle Pet Orb state
     if button14 then
         if _G.D32CharacterData and _G.D32CharacterData.petOrb then
             button14:SetChecked(_G.D32CharacterData.petOrb.enabled == true)
             -- Apply pet orb state
             if _G.petOrb then
-                if _G.D32CharacterData.petOrb.enabled then
+                if _G.D32CharacterData.petOrb.enabled and hide_pet_frame_state ~= 1 then
                     RegisterUnitWatch(_G.petOrb)
                 else
                     UnregisterUnitWatch(_G.petOrb)
                     _G.petOrb:Hide()
+                    if hide_pet_frame_state == 1 then
+                        _G.D32CharacterData.petOrb.enabled = false
+                        button14:SetChecked(false)
+                    end
                 end
             end
         else
             -- Default to checked if D32CharacterData not available yet
             button14:SetChecked(true)
         end
-        
-        -- Enable/disable Toggle Pet Orb based on Diablo Orbs state
-        if diablo_orbs_state == 1 then
-            -- Diablo Orbs are active, enable the checkbox
-            button14:Enable()
-            button14:SetAlpha(1.0)
-            button14:EnableMouse(true)
-        else
-            -- Diablo Orbs are inactive, disable and grey out the checkbox
-            button14:Disable()
-            button14:SetAlpha(0.5)
-            button14:EnableMouse(false)
-        end
+    end
+
+    if UpdatePetOrbPetFrameExclusion then
+        UpdatePetOrbPetFrameExclusion()
+    end
+    if _G.RefreshBlizzardPetFrame then
+        _G.RefreshBlizzardPetFrame()
     end
     
     -- Handle mutual exclusion between Reposition Unitframes and Diablo Orbs
@@ -1447,24 +1901,65 @@ initFrame:SetScript('OnEvent', function(self, event)
     -- Update button position based on initial micromenu state
     UpdateButtonPosition()
     
-    -- Hook into bagstoggle button to update main toggle position when clicked
-    if _G.bagstoggle then
-        local originalOnClick = _G.bagstoggle:GetScript('OnClick')
-        _G.bagstoggle:SetScript('OnClick', function(self, ...)
-            if originalOnClick then
-                originalOnClick(self, ...)
+    -- Keep panel checkboxes in sync when on-screen toggle arrows are used
+    local function SyncToggleCheckboxes()
+        if button1 then button1:SetChecked((party_state or 0) == 1) end
+        if button2 then button2:SetChecked((chat_state or 0) == 1) end
+        if button3 then
+            -- Panel checked = stance bars hidden (inverted vs stancetoggle)
+            if _G.stancetoggle then
+                button3:SetChecked(not _G.stancetoggle:GetChecked())
+            else
+                button3:SetChecked((stance_state or 1) == 0)
             end
-            -- Update main toggle position immediately after bagstoggle state changes
-            -- bags_state is updated synchronously in the original handler, so we can check it immediately
-            UpdateButtonPosition()
+        end
+        if button4 then button4:SetChecked((caps_state or 1) == 1) end
+        if button5 and UpdateBottomBarsDisplay then UpdateBottomBarsDisplay() end
+        if button6 then button6:SetChecked((sidebars_state or 0) == 1) end
+        if button7 then button7:SetChecked((bags_state or 0) == 1) end
+        if button8 then button8:SetChecked((quest_state or 0) == 1) end
+        -- Buff checkbox is inverted: checked = hidden
+        if button9 then button9:SetChecked((buffs_state or 1) == 0) end
+        if button15 then
+            if UpdateRaidFramesToggleAvailability then
+                UpdateRaidFramesToggleAvailability()
+            else
+                button15:SetChecked(DrakeishUI_GetRaidFramesState() == 1)
+            end
+        end
+        if button17 then button17:SetChecked((hide_pet_frame_state or 0) == 1) end
+    end
+
+    local function HookUIToggleSync(toggleName, afterClick)
+        local toggle = _G[toggleName]
+        if not toggle or toggle.drakeishCheckboxSynced then return end
+        toggle.drakeishCheckboxSynced = true
+        local original = toggle:GetScript('OnClick')
+        toggle:SetScript('OnClick', function(self, ...)
+            if original then original(self, ...) end
+            SyncToggleCheckboxes()
+            if afterClick then afterClick(self) end
         end)
     end
+
+    HookUIToggleSync('partytoggle')
+    HookUIToggleSync('chattoggle')
+    HookUIToggleSync('stancetoggle')
+    HookUIToggleSync('gryphontoggle')
+    HookUIToggleSync('bottombarstoggle')
+    HookUIToggleSync('sidebarstoggle')
+    HookUIToggleSync('bagstoggle', function()
+        UpdateButtonPosition()
+    end)
+    HookUIToggleSync('watchframetoggle')
+    HookUIToggleSync('buffstoggle')
     
     -- Apply the saved state on login
     if hide_toggle_buttons == 1 then
         -- Hide all main toggle buttons
         if _G.partytoggle then _G.partytoggle:Hide() end
         if _G.chattoggle then _G.chattoggle:Hide() end
+        if _G.DrakeishUI_ChatViewToggle then _G.DrakeishUI_ChatViewToggle:Hide() end
         if _G.stancetoggle then _G.stancetoggle:Hide() end
         if _G.gryphontoggle then _G.gryphontoggle:Hide() end
         if _G.bottombarstoggle then _G.bottombarstoggle:Hide() end
@@ -1478,6 +1973,7 @@ initFrame:SetScript('OnEvent', function(self, event)
         -- Show all main toggle buttons
         if _G.partytoggle then _G.partytoggle:Show() end
         if _G.chattoggle then _G.chattoggle:Show() end
+        if _G.DrakeishUI_ChatViewToggle then _G.DrakeishUI_ChatViewToggle:Show() end
         if _G.stancetoggle then _G.stancetoggle:Show() end
         if _G.gryphontoggle then _G.gryphontoggle:Show() end
         if _G.bottombarstoggle then _G.bottombarstoggle:Show() end
@@ -1584,6 +2080,7 @@ gryphonRestoreFrame:SetScript('OnEvent', function(self, event, arg1)
                 if not gryphon_style_state then gryphon_style_state = 1 end
                 ApplyGryphonStyle(gryphon_style_state)
                 UpdateGryphonStyleDisplay()
+                UpdateRaidFrameStyleDisplay()
                 
                 -- Restore Diablo Orbs state
                 if not diablo_orbs_state then diablo_orbs_state = 0 end
@@ -1591,10 +2088,30 @@ gryphonRestoreFrame:SetScript('OnEvent', function(self, event, arg1)
                     button13:SetChecked(diablo_orbs_state == 1)
                 end
                 ToggleDiabloOrbs(diablo_orbs_state == 1)
+
+                -- Restore Toggle Pet Frame
+                if not hide_pet_frame_state then hide_pet_frame_state = 0 end
+                if button17 then
+                    button17:SetChecked(hide_pet_frame_state == 1)
+                end
+
+                -- Restore Toggle Raid Frames and the chosen frame style
+                DrakeishUI_SetRaidFramesState(DrakeishUI_GetRaidFramesState())
+                DrakeishUI_SetRaidFrameStyle(DrakeishUI_GetRaidFrameStyle())
+                UpdateRaidFrameStyleDisplay()
+                if UpdateRaidFramesToggleAvailability then
+                    UpdateRaidFramesToggleAvailability()
+                end
+                if _G.DrakeishUI_UpdateRaidFrames then
+                    _G.DrakeishUI_UpdateRaidFrames()
+                end
                 
                 -- Restore Toggle Pet Orb state
                 if button14 then
                     if _G.D32CharacterData and _G.D32CharacterData.petOrb then
+                        if hide_pet_frame_state == 1 then
+                            _G.D32CharacterData.petOrb.enabled = false
+                        end
                         button14:SetChecked(_G.D32CharacterData.petOrb.enabled == true)
                         if _G.petOrb then
                             if _G.D32CharacterData.petOrb.enabled then
@@ -1605,19 +2122,15 @@ gryphonRestoreFrame:SetScript('OnEvent', function(self, event, arg1)
                             end
                         end
                     else
-                        button14:SetChecked(true)
+                        button14:SetChecked(hide_pet_frame_state ~= 1)
                     end
-                    
-                    -- Enable/disable Toggle Pet Orb based on Diablo Orbs state
-                    if diablo_orbs_state == 1 then
-                        button14:Enable()
-                        button14:SetAlpha(1.0)
-                        button14:EnableMouse(true)
-                    else
-                        button14:Disable()
-                        button14:SetAlpha(0.5)
-                        button14:EnableMouse(false)
-                    end
+                end
+
+                if UpdatePetOrbPetFrameExclusion then
+                    UpdatePetOrbPetFrameExclusion()
+                end
+                if _G.RefreshBlizzardPetFrame then
+                    _G.RefreshBlizzardPetFrame()
                 end
                 
                 self:SetScript("OnUpdate", nil)
@@ -1630,6 +2143,7 @@ gryphonRestoreFrame:SetScript('OnEvent', function(self, event, arg1)
         -- Apply the restored state immediately
         ApplyGryphonStyle(gryphon_style_state)
         UpdateGryphonStyleDisplay()
+        UpdateRaidFrameStyleDisplay()
         
         -- Restore Diablo Orbs state
         if not diablo_orbs_state then diablo_orbs_state = 0 end
@@ -1648,9 +2162,16 @@ gryphonRestoreFrame:SetScript('OnEvent', function(self, event, arg1)
             end
         end)
         
-        -- Restore Toggle Pet Orb state
+        -- Restore Toggle Pet Frame / Pet Orb mutual exclusion
+        if not hide_pet_frame_state then hide_pet_frame_state = 0 end
+        if button17 then
+            button17:SetChecked(hide_pet_frame_state == 1)
+        end
         if button14 then
             if _G.D32CharacterData and _G.D32CharacterData.petOrb then
+                if hide_pet_frame_state == 1 then
+                    _G.D32CharacterData.petOrb.enabled = false
+                end
                 button14:SetChecked(_G.D32CharacterData.petOrb.enabled == true)
                 if _G.petOrb then
                     if _G.D32CharacterData.petOrb.enabled then
@@ -1661,19 +2182,14 @@ gryphonRestoreFrame:SetScript('OnEvent', function(self, event, arg1)
                     end
                 end
             else
-                button14:SetChecked(true)
+                button14:SetChecked(hide_pet_frame_state ~= 1)
             end
-            
-            -- Enable/disable Toggle Pet Orb based on Diablo Orbs state
-            if diablo_orbs_state == 1 then
-                button14:Enable()
-                button14:SetAlpha(1.0)
-                button14:EnableMouse(true)
-            else
-                button14:Disable()
-                button14:SetAlpha(0.5)
-                button14:EnableMouse(false)
-            end
+        end
+        if UpdatePetOrbPetFrameExclusion then
+            UpdatePetOrbPetFrameExclusion()
+        end
+        if _G.RefreshBlizzardPetFrame then
+            _G.RefreshBlizzardPetFrame()
         end
     end
 end)

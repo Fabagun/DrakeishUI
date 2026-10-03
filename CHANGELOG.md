@@ -1,6 +1,37 @@
 # Changelog
 
-## Recent Updates
+## 2.0.0
+
+### Nameplates
+- Show nameplates for enemies, friends, and neutrals, saved with the client
+- Three modes: selected unit only, that same look on every unit, or native Blizzard plates
+- Selected unit in the all-units mode uses a bright name with a blue halo
+- Level numbers sit closer to their shadow
+
+### Raid frames
+- Compact raid frames, shown while in a raid when the toggle is on
+- Two frame styles
+- Health fill shades darker on the left and lighter on the right, matching the nameplates
+
+### Minimap
+- Border turns with the map, and the double arrow stays on north
+- Rotate minimap checkbox, kept in step with Interface → Display
+- Minimap button toggle travels with the border
+
+### Settings
+- DrakeishUI settings window for party frames, chat, bars, gryphons, raid frames, nameplates, Diablo orbs, and the pet frame
+- Gryphon style and raid frame style are numbered cycles and persist on reload
+
+### Windows
+- Talent window with loadouts, using the modern frame chrome
+- Spellbook, character panel, collections, encounter journal, social window, and world map use the same chrome
+- Bags use Bagster, with search and sort, in place of Combuctor
+
+### Diablo orbs
+- Guardian and Demon Hunter power orbs use their class power color
+- Health orb stays red
+
+## 1.0.0
 
 ### Diablo Orbs Integration
 - **Added Mistra's Diablo Orbs**: Integrated the full Diablo-style orb system for health, mana, and pet

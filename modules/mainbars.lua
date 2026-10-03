@@ -71,23 +71,20 @@ function MainMenuBarMixin:actionbar_art_setup()
 	end
 	
 	if config.style.gryphons == 'old' then
-		MainMenuBarLeftEndCap:SetClearPoint('BOTTOMLEFT', -85, -22)
-		MainMenuBarRightEndCap:SetClearPoint('BOTTOMRIGHT', 84, -22)
 		-- Always show Alliance gryphon on left, Horde wyvern on right
 		MainMenuBarLeftEndCap:set_atlas('ui-hud-actionbar-gryphon-left', true)
 		MainMenuBarRightEndCap:set_atlas('ui-hud-actionbar-gryphon-right', true)
+		addon.SetEndCapBasePoints(-85, 84, -22)
 	elseif config.style.gryphons == 'new' then
-		MainMenuBarLeftEndCap:SetClearPoint('BOTTOMLEFT', -95, -23)
-		MainMenuBarRightEndCap:SetClearPoint('BOTTOMRIGHT', 95, -23)
 		-- Always show Alliance gryphon on left, Horde wyvern on right
 		MainMenuBarLeftEndCap:set_atlas('ui-hud-actionbar-gryphon-thick-left', true)
 		MainMenuBarRightEndCap:set_atlas('ui-hud-actionbar-wyvern-thick-right', true)
+		addon.SetEndCapBasePoints(-95, 95, -23)
 	elseif config.style.gryphons == 'flying' then
-		MainMenuBarLeftEndCap:SetClearPoint('BOTTOMLEFT', -80, -21)
-		MainMenuBarRightEndCap:SetClearPoint('BOTTOMRIGHT', 80, -21)
 		-- Always show Alliance gryphon on left, Horde wyvern on right
 		MainMenuBarLeftEndCap:set_atlas('ui-hud-actionbar-gryphon-flying-left', true)
 		MainMenuBarRightEndCap:set_atlas('ui-hud-actionbar-gryphon-flying-right', true)
+		addon.SetEndCapBasePoints(-80, 80, -21)
 	else
 		MainMenuBarLeftEndCap:Hide()
 		MainMenuBarRightEndCap:Hide()
@@ -182,7 +179,7 @@ end,
 );
 
 function MainMenuBarMixin:statusbar_setup()
-	for _,bar in pairs({MainMenuExpBar,ReputationWatchStatusBar}) do
+	for _,bar in pairs({MainMenuExpBar, ReputationWatchStatusBar}) do
 		bar:GetStatusBarTexture():SetDrawLayer('BORDER')
 		bar.status = bar:CreateTexture(nil, 'ARTWORK')
 		if old then
@@ -204,13 +201,18 @@ function MainMenuBarMixin:statusbar_setup()
 			bar.status:Hide()
 		end
 	end
+
+	-- Rep fill max is 2px short of the shared bar width (right edge only)
+	if new then
+		ReputationWatchStatusBar:SetWidth(535)
+	end
 	
-	-- Position XP bar above reputation bar (inverted positions)
+	-- Default: XP above reputation; ReputationWatchBar_Update / actionbar_update refine this
 	MainMenuExpBar:SetClearPoint('BOTTOM', UIParent, 3, 22)
 	MainMenuExpBar:SetFrameLevel(10)
 	ReputationWatchBar:SetParent(pUiMainBar)
 	ReputationWatchBar:SetFrameLevel(10)
-	ReputationWatchBar:SetWidth(ReputationWatchStatusBar:GetWidth())
+	ReputationWatchBar:SetWidth(537)
 	ReputationWatchBar:SetHeight(ReputationWatchStatusBar:GetHeight())
 	
 	MainMenuBarExpText:SetParent(MainMenuExpBar)
@@ -225,6 +227,50 @@ function MainMenuBarMixin:statusbar_setup()
 	end
 end
 
+-- High-contrast azure XP fill (rested uses a slightly brighter tint)
+local XP_FILL_AZURE = { 0.0, 0.72, 1.0, 1.0 }
+local XP_FILL_AZURE_RESTED = { 0.15, 0.82, 1.0, 1.0 }
+
+-- Standard WoW standing hues, boosted for contrast/vibrancy
+-- 1 Hated, 2 Hostile, 3 Unfriendly, 4 Neutral, 5 Friendly, 6 Honored, 7 Revered, 8 Exalted
+local REP_FILL_COLORS = {
+	[1] = { 1.00, 0.18, 0.18 }, -- Hated (red)
+	[2] = { 1.00, 0.42, 0.08 }, -- Hostile (orange-red)
+	[3] = { 1.00, 0.62, 0.12 }, -- Unfriendly (orange)
+	[4] = { 1.00, 0.95, 0.12 }, -- Neutral (yellow)
+	[5] = { 0.18, 0.92, 0.22 }, -- Friendly (green)
+	[6] = { 0.12, 0.55, 1.00 }, -- Honored (blue)
+	[7] = { 0.78, 0.28, 1.00 }, -- Revered (purple)
+	[8] = { 1.00, 0.86, 0.22 }, -- Exalted (gold)
+}
+
+local function ApplyXpBarFillColor()
+	if not new then return end
+	local exhaustionStateID = GetRestState()
+	local c = (exhaustionStateID == 1) and XP_FILL_AZURE_RESTED or XP_FILL_AZURE
+	MainMenuExpBar:SetStatusBarTexture(addon._dir..'statusbarfill.tga')
+	MainMenuExpBar:SetStatusBarColor(c[1], c[2], c[3], c[4])
+	local tex = MainMenuExpBar:GetStatusBarTexture()
+	if tex then
+		tex:SetTexCoord(0, 1, 0, 1)
+		tex:SetVertexColor(c[1], c[2], c[3], c[4])
+	end
+end
+
+local function ApplyRepBarFillColor()
+	if not new then return end
+	local name, reaction = GetWatchedFactionInfo()
+	if not name or not reaction then return end
+	local c = REP_FILL_COLORS[reaction] or REP_FILL_COLORS[4]
+	ReputationWatchStatusBar:SetStatusBarTexture(addon._dir..'statusbarfill.tga')
+	ReputationWatchStatusBar:SetStatusBarColor(c[1], c[2], c[3], 1)
+	local tex = ReputationWatchStatusBar:GetStatusBarTexture()
+	if tex then
+		tex:SetTexCoord(0, 1, 0, 1)
+		tex:SetVertexColor(c[1], c[2], c[3], 1)
+	end
+end
+
 event:RegisterEvents(function(self)
 	self:UnregisterEvent('PLAYER_ENTERING_WORLD');
 	local exhaustionStateID = GetRestState();
@@ -236,14 +282,13 @@ event:RegisterEvents(function(self)
 		ExhaustionTick:SetSize(10, 14);
 		ExhaustionTick:SetClearPoint('CENTER', ExhaustionLevelFillBar, 'RIGHT', 0, 2);
 
-		MainMenuExpBar:SetStatusBarTexture(addon._dir..'uiexperiencebar');
+		ApplyXpBarFillColor()
+		ApplyRepBarFillColor()
 		if exhaustionStateID == 1 then
 			ExhaustionTick:Show();
-			MainMenuExpBar:GetStatusBarTexture():SetTexCoord(574/2048, 1137/2048, 34/64, 43/64);
-			ExhaustionLevelFillBar:SetVertexColor(0.0, 0, 1, 0.45);
+			ExhaustionLevelFillBar:SetVertexColor(0.0, 0.55, 1.0, 0.45);
 		elseif exhaustionStateID == 2 then
-			MainMenuExpBar:GetStatusBarTexture():SetTexCoord(1/2048, 570/2048, 42/64, 51/64);
-			ExhaustionLevelFillBar:SetVertexColor(0.58, 0.0, 0.55, 0.45);
+			ExhaustionLevelFillBar:SetVertexColor(0.0, 0.45, 0.9, 0.35);
 		end
 	else
 		if exhaustionStateID == 1 then
@@ -252,7 +297,9 @@ event:RegisterEvents(function(self)
 	end
 end,
 	'PLAYER_ENTERING_WORLD',
-	'UPDATE_EXHAUSTION'
+	'UPDATE_EXHAUSTION',
+	'PLAYER_XP_UPDATE',
+	'UPDATE_FACTION'
 );
 
 local both = config.xprepbar.bothbar_offset;
@@ -261,50 +308,107 @@ local nobar	= config.xprepbar.nobar_offset;
 local abovexp = config.xprepbar.repbar_abovexp_offset;
 local default = config.xprepbar.repbar_offset;
 
-hooksecurefunc('ReputationWatchBar_Update',function()
-	local name = GetWatchedFactionInfo();
-	if name then
-		-- Position reputation bar below XP bar with 3px spacing (closest to main action bar)
-		ReputationWatchBar:SetClearPoint('BOTTOM', UIParent, 3, 3);
-		ReputationWatchBarOverlayFrame:SetClearPoint('BOTTOM', UIParent, 3, 3);
+-- Bottom stack: rep at y=3 (when tracked), XP above it at y=22.
+-- When no reputation is tracked, XP drops to y=3 and the main bar uses singlebar_offset
+-- so action / stance / pet bars follow downward.
+local XP_BAR_Y_WITH_REP = 22
+local XP_BAR_Y_ALONE = 3
+local REP_BAR_Y = 3
+
+-- End caps stay at the screen Y of the bothbar layout while the main bar moves
+local mainBarYOffset = both
+local endCapLeftX, endCapRightX, endCapBaseY = -95, 95, -23
+
+local function RefreshEndCapPositions()
+	if not MainMenuBarLeftEndCap or not MainMenuBarRightEndCap then return end
+	local y = endCapBaseY + (both - mainBarYOffset)
+	MainMenuBarLeftEndCap:SetClearPoint('BOTTOMLEFT', endCapLeftX, y)
+	MainMenuBarRightEndCap:SetClearPoint('BOTTOMRIGHT', endCapRightX, y)
+end
+
+function addon.SetEndCapBasePoints(leftX, rightX, baseY)
+	endCapLeftX, endCapRightX, endCapBaseY = leftX, rightX, baseY
+	RefreshEndCapPositions()
+end
+
+addon.RefreshEndCapPositions = RefreshEndCapPositions
+
+local function StatusBars_UpdateLayout()
+	local watchedName = GetWatchedFactionInfo()
+	local xpShown = MainMenuExpBar:IsShown()
+	-- Blizzard shows ReputationWatchBar when a faction is watched
+	local repShown = watchedName ~= nil
+
+	if xpShown and repShown then
+		MainMenuExpBar:SetClearPoint('BOTTOM', UIParent, 3, XP_BAR_Y_WITH_REP)
+		ReputationWatchBar:SetClearPoint('BOTTOM', UIParent, 3, REP_BAR_Y)
+		if ReputationWatchBarOverlayFrame then
+			ReputationWatchBarOverlayFrame:SetClearPoint('BOTTOM', UIParent, 3, REP_BAR_Y)
+		end
 		ReputationWatchStatusBar:SetHeight(10)
+		ReputationWatchStatusBar:SetWidth(535)
 		ReputationWatchStatusBar:SetClearPoint('TOPLEFT', ReputationWatchBar, 0, 3)
-		ReputationWatchStatusBarText:SetClearPoint('CENTER', ReputationWatchStatusBar, 'CENTER', 0, old and 0 or 1);
+		ReputationWatchStatusBarText:SetClearPoint('CENTER', ReputationWatchStatusBar, 'CENTER', 0, old and 0 or 1)
 		ReputationWatchStatusBarBackground:SetAllPoints(ReputationWatchStatusBar)
+		mainBarYOffset = both
+		pUiMainBar:SetPoint('BOTTOM', UIParent, 'BOTTOM', 0, both)
+	elseif xpShown then
+		-- No tracked reputation: XP occupies the lower slot
+		MainMenuExpBar:SetClearPoint('BOTTOM', UIParent, 3, XP_BAR_Y_ALONE)
+		mainBarYOffset = single
+		pUiMainBar:SetPoint('BOTTOM', UIParent, 'BOTTOM', 0, single)
+	elseif repShown then
+		-- Max level (or XP hidden) with reputation tracked
+		ReputationWatchBar:SetClearPoint('BOTTOM', UIParent, 3, REP_BAR_Y)
+		if ReputationWatchBarOverlayFrame then
+			ReputationWatchBarOverlayFrame:SetClearPoint('BOTTOM', UIParent, 3, REP_BAR_Y)
+		end
+		ReputationWatchStatusBar:SetHeight(10)
+		ReputationWatchStatusBar:SetWidth(535)
+		ReputationWatchStatusBar:SetClearPoint('TOPLEFT', ReputationWatchBar, 0, 3)
+		ReputationWatchStatusBarText:SetClearPoint('CENTER', ReputationWatchStatusBar, 'CENTER', 0, old and 0 or 1)
+		ReputationWatchStatusBarBackground:SetAllPoints(ReputationWatchStatusBar)
+		mainBarYOffset = single
+		pUiMainBar:SetPoint('BOTTOM', UIParent, 'BOTTOM', 0, single)
+	else
+		mainBarYOffset = nobar
+		pUiMainBar:SetPoint('BOTTOM', UIParent, 'BOTTOM', 0, nobar)
 	end
+
+	RefreshEndCapPositions()
+
+	-- Stance / pet anchors are relative to pUiMainBar; refresh their stacked offsets
+	if pUiStanceHolder and pUiStanceHolder.stancebar_update then
+		pUiStanceHolder:stancebar_update()
+	end
+	if pUiPetBarHolder and pUiPetBarHolder.petbar_update then
+		pUiPetBarHolder:petbar_update()
+	end
+end
+
+hooksecurefunc('ReputationWatchBar_Update', function()
+	StatusBars_UpdateLayout()
+	ApplyRepBarFillColor()
 end)
 
--- method update position - always keep main bar at "both bars visible" position
 function pUiMainBar:actionbar_update()
-	-- Always position main bar as if both XP and rep bars are visible
-	-- This prevents toggle buttons from going off screen when bars are hidden
-	self:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, both);
+	StatusBars_UpdateLayout()
 end
 
 event:RegisterEvents(function()
 	pUiMainBar:actionbar_update();
 end,
-	'PLAYER_LOGIN','ADDON_LOADED'
+	'PLAYER_LOGIN','ADDON_LOADED','PLAYER_LEVEL_UP','UPDATE_EXHAUSTION','PLAYER_XP_UPDATE'
 );
 
-
-for _,bar in pairs({MainMenuExpBar,ReputationWatchBar}) do
-	if notRequired then return; end
-	
-	local yOffset = select(5, pUiMainBar:GetPoint());
-	if (yOffset == nobar) then notRequired = true; end
-	
-	bar:HookScript('OnShow',function()
-		if (yOffset ~= nobar) then
-			pUiMainBar:actionbar_update();
-		end
-	end);
-	bar:HookScript('OnHide',function()
-		if (yOffset ~= nobar) then
-			pUiMainBar:actionbar_update();
-		end
-	end);
-end;
+for _,bar in pairs({MainMenuExpBar, ReputationWatchBar}) do
+	bar:HookScript('OnShow', function()
+		StatusBars_UpdateLayout()
+	end)
+	bar:HookScript('OnHide', function()
+		StatusBars_UpdateLayout()
+	end)
+end
 
 function MainMenuBarMixin:initialize()
 	self:actionbutton_setup();

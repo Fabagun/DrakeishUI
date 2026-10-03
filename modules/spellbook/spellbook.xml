@@ -1,0 +1,5 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+	<Script file="Assets.lua"/>
+	<Script file="Window.lua"/>
+	<Script file="Spellbook.lua"/>
+</Ui>

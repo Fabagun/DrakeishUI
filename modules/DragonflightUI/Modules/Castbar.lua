@@ -491,43 +491,76 @@ function Module.ChangeDefaultCastbar()
         TargetFrameSpellBar:SetPoint('TOPLEFT', TargetFrame, 'BOTTOMLEFT', 25 - 20, 22)
         
         -- Hook OnShow to reapply our position when castbar shows (prevents Blizzard from overwriting)
+        -- IMPORTANT: GetScript('OnShow') may be a direct ref to Target_Spellbar_AdjustPosition.
+        -- Never call it while parent lacks auraRows (UIParent / Diablo frame) — that crashes.
+        -- TargetFrame is hidden under Diablo orbs, so parent the bar to UIParent to stay visible.
         local originalOnShow = TargetFrameSpellBar:GetScript('OnShow')
         TargetFrameSpellBar:SetScript('OnShow', function(self)
-            if originalOnShow then
-                originalOnShow(self)
+            -- Diablo orbs target frame owns the castbar while active
+            if _G.diablo_orbs_state == 1 and _G.DrakeishUI_DiabloTargetFrame and _G.DrakeishUI_DiabloTargetFrame:IsShown()
+                and _G.DrakeishUI_DiabloTargetFrame.healthBar then
+                self:SetParent(UIParent)
+                self:ClearAllPoints()
+                self:SetPoint('TOP', _G.DrakeishUI_DiabloTargetFrame.healthBar, 'BOTTOM', 0, -15)
+                self:SetFrameStrata('HIGH')
+                local hbWidth = _G.DrakeishUI_DiabloTargetFrame.healthBar:GetWidth()
+                if hbWidth and hbWidth > 0 then
+                    self:SetWidth(hbWidth)
+                    self:SetHeight(8)
+                end
+                -- Keep border locked to the bar edges
+                if self.drakeishBorder then
+                    self.drakeishBorder:ClearAllPoints()
+                    self.drakeishBorder:SetPoint('TOPLEFT', self, 'TOPLEFT', -2, 2)
+                    self.drakeishBorder:SetPoint('BOTTOMRIGHT', self, 'BOTTOMRIGHT', 2, -2)
+                end
+                return
             end
-            -- Reapply our custom position after Blizzard's code runs
+            if originalOnShow then
+                if self:GetParent() ~= TargetFrame and TargetFrame then
+                    self:SetParent(TargetFrame)
+                end
+                local parent = self:GetParent()
+                if parent and parent.auraRows ~= nil then
+                    originalOnShow(self)
+                end
+            end
+            -- Reapply DragonflightUI position under default TargetFrame
+            self:SetParent(TargetFrame)
             self:ClearAllPoints()
             self:SetPoint('TOPLEFT', TargetFrame, 'BOTTOMLEFT', 25 - 20, 22)
         end)
         
         -- Create background texture (grey texture under the filling one)
-        local bgTex = TargetFrameSpellBar:CreateTexture('TargetCastbarBackground', 'BACKGROUND')
+        local bgTex = TargetFrameSpellBar:CreateTexture(nil, 'BACKGROUND')
         bgTex:SetAllPoints()
         bgTex:SetTexture(backgroundRef)
+        TargetFrameSpellBar.drakeishBg = bgTex
         
-        -- Set the status bar texture and make it visible
-        if TargetFrameSpellBar:GetStatusBarTexture() then
-            TargetFrameSpellBar:GetStatusBarTexture():SetTexture(standardRef)
-            TargetFrameSpellBar:GetStatusBarTexture():SetAlpha(1)
-            TargetFrameSpellBar:GetStatusBarTexture():Show()
-            -- Make the progress bar wider on Y-axis to fill gaps
-            TargetFrameSpellBar:GetStatusBarTexture():SetPoint('TOPLEFT', TargetFrameSpellBar, 'TOPLEFT', 0, 2)
-            TargetFrameSpellBar:GetStatusBarTexture():SetPoint('BOTTOMRIGHT', TargetFrameSpellBar, 'BOTTOMRIGHT', 0, -2)
+        -- Status bar fill — leave points to StatusBar (do not pin BOTTOMRIGHT or fill
+        -- always stretches to full bar and can outgrow a fixed-size border)
+        local fill = TargetFrameSpellBar:GetStatusBarTexture()
+        if fill then
+            fill:SetTexture(standardRef)
+            fill:SetAlpha(1)
+            fill:Show()
         end
         
-        -- Create border texture (thinner on Y-axis)
-        local border = TargetFrameSpellBar:CreateTexture('TargetCastbarBorder', 'OVERLAY')
+        -- Border tracks the bar size (2px pad) so it always matches when width changes
+        local border = TargetFrameSpellBar:CreateTexture(nil, 'OVERLAY')
         border:SetTexture(borderRef)
-        border:SetSize(175 + 4, 8 + 4)  -- Reduced Y padding from 8 to 4
-        border:SetPoint('CENTER', TargetFrameSpellBar, 'CENTER', 0, 0)
+        border:ClearAllPoints()
+        border:SetPoint('TOPLEFT', TargetFrameSpellBar, 'TOPLEFT', -2, 2)
+        border:SetPoint('BOTTOMRIGHT', TargetFrameSpellBar, 'BOTTOMRIGHT', 2, -2)
+        TargetFrameSpellBar.drakeishBorder = border
         
         -- Create spark texture
-        local spark = TargetFrameSpellBar:CreateTexture('TargetCastbarSpark', 'OVERLAY')
+        local spark = TargetFrameSpellBar:CreateTexture(nil, 'OVERLAY')
         spark:SetTexture(sparkRef)
         spark:SetSize(20, 32)
         spark:SetPoint('CENTER', TargetFrameSpellBar, 'CENTER', 0, 0)
         spark:SetBlendMode('ADD')
+        TargetFrameSpellBar.drakeishSpark = spark
         
         -- Center the spell text vertically
         if TargetFrameSpellBar.Text then
@@ -543,15 +576,18 @@ function Module.ChangeDefaultCastbar()
             end
             
             -- Update spark position
+            local sparkTex = self.drakeishSpark
+            if not sparkTex then return end
             local value = self:GetValue()
             local minVal, maxVal = self:GetMinMaxValues()
-            if maxVal > 0 then
+            if maxVal and maxVal > 0 then
                 local percent = value / maxVal
                 if percent >= 1 then
-                    spark:Hide()
+                    sparkTex:Hide()
                 else
-                    spark:Show()
-                    spark:SetPoint('CENTER', self, 'LEFT', percent * 175, 0)
+                    sparkTex:Show()
+                    sparkTex:ClearAllPoints()
+                    sparkTex:SetPoint('CENTER', self, 'LEFT', percent * self:GetWidth(), 0)
                 end
             end
         end)

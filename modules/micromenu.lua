@@ -12,7 +12,26 @@ local PERFORMANCEBAR_MEDIUM_LATENCY = 600;
 
 local MainMenuMicroButtonMixin = {};
 local MainMenuBarBackpackButton = _G.MainMenuBarBackpackButton;
-local HelpMicroButton = _G.HelpMicroButton;
+local MainMenuMicroButton = _G.MainMenuMicroButton;
+
+local AdventureGuideMicroButton = CreateFrame("Button", "AdventureGuideMicroButton", UIParent)
+AdventureGuideMicroButton:SetSize(14, 19)
+AdventureGuideMicroButton:SetNormalTexture("Interface\\Buttons\\WHITE8X8")
+AdventureGuideMicroButton:SetPushedTexture("Interface\\Buttons\\WHITE8X8")
+AdventureGuideMicroButton:SetHighlightTexture("Interface\\Buttons\\WHITE8X8")
+AdventureGuideMicroButton:SetDisabledTexture("Interface\\Buttons\\WHITE8X8")
+AdventureGuideMicroButton:SetScript("OnClick", function()
+	local journal = DrakeishUI_SocialNE and DrakeishUI_SocialNE.ej
+	if journal and journal.Toggle then journal.Toggle() end
+	-- Frame is built lazily; wire + sync after Toggle so open AND close both update art.
+	if addon.SyncOpenMicroButtons then addon.SyncOpenMicroButtons() end
+end)
+AdventureGuideMicroButton:SetScript("OnEnter", function(self)
+	GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+	GameTooltip:SetText("Adventure Guide")
+	GameTooltip:Show()
+end)
+AdventureGuideMicroButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
 local KeyRingButton = _G.KeyRingButton;
 
 local bagslots = {
@@ -26,13 +45,12 @@ local MICRO_BUTTONS = {
 	_G.SpellbookMicroButton,
 	_G.TalentMicroButton,
 	_G.AchievementMicroButton,
-	_G.QuestLogMicroButton,
+	_G.CollectionsMicroButton, -- replaces Quest Log (quest log lives on the world map)
 	_G.SocialsMicroButton,
 	_G.LFDMicroButton,
-	_G.CollectionsMicroButton,
 	_G.PVPMicroButton,
+	AdventureGuideMicroButton,
 	_G.MainMenuMicroButton,
-	_G.HelpMicroButton,
 };
 local pUiBagsBar = CreateFrame(
 	'Frame',
@@ -51,7 +69,7 @@ function MainMenuMicroButtonMixin:bagbuttons_setup()
 	MainMenuBarBackpackButton:GetHighlightTexture():set_atlas('bag-main-highlight-2x')
 	MainMenuBarBackpackButton:GetCheckedTexture():set_atlas('bag-main-highlight-2x')
 	MainMenuBarBackpackButtonIconTexture:set_atlas('bag-main-2x')
-	MainMenuBarBackpackButton:SetClearPoint('BOTTOMRIGHT', HelpMicroButton, 'BOTTOMRIGHT', 0, 30)
+	MainMenuBarBackpackButton:SetClearPoint('BOTTOMRIGHT', MainMenuMicroButton, 'BOTTOMRIGHT', 0, 30)
 	MainMenuBarBackpackButton.SetPoint = addon._noop
 	
 	MainMenuBarBackpackButtonCount:SetClearPoint('CENTER', MainMenuBarBackpackButton, 'BOTTOM', 0, 14)
@@ -142,7 +160,7 @@ do
 	if config.style.bags == 'new' then
 		MainMenuMicroButtonMixin:bagbuttons_setup();
 	elseif config.style.bags == 'old' then
-		MainMenuBarBackpackButton:SetClearPoint('BOTTOMRIGHT', HelpMicroButton, 'BOTTOMRIGHT', 0, 34)
+		MainMenuBarBackpackButton:SetClearPoint('BOTTOMRIGHT', MainMenuMicroButton, 'BOTTOMRIGHT', 0, 34)
 		MainMenuBarBackpackButtonIconTexture:SetTexture(addon._dir..'INV_Misc_Bag_08')
 		CharacterBag0Slot:SetClearPoint('RIGHT', MainMenuBarBackpackButton, 'LEFT', -20, 0)
 	else
@@ -151,6 +169,28 @@ do
 			bags:Hide();
 		end
 	end
+end
+
+-- GameMenuFrame_OnShow calls Disable_BagButtons, which desaturates the backpack.
+-- Keep the bag art full color while the game menu is open.
+local function RestoreBagButtons()
+	local function undesaturate(tex)
+		if not tex then return end
+		if SetDesaturation then SetDesaturation(tex, nil) end
+		if tex.SetDesaturated then tex:SetDesaturated(false) end
+		if tex.SetVertexColor then tex:SetVertexColor(1, 1, 1) end
+	end
+	if MainMenuBarBackpackButton then
+		MainMenuBarBackpackButton:Enable()
+		undesaturate(_G.MainMenuBarBackpackButtonIconTexture)
+	end
+	for _, bags in pairs(bagslots) do
+		if bags.Enable then bags:Enable() end
+		undesaturate(_G[bags:GetName() .. "IconTexture"])
+	end
+end
+if type(Disable_BagButtons) == "function" then
+	hooksecurefunc("Disable_BagButtons", RestoreBagButtons)
 end
 
 -- Make arrow accessible outside the do block
@@ -218,12 +258,47 @@ do
 	);
 end
 
-hooksecurefunc('MiniMapLFG_UpdateIsShown',function()
-	MiniMapLFGFrame:SetClearPoint('LEFT', _G.CharacterMicroButton, -32, 2)
-	MiniMapLFGFrame:SetScale(1.6)
-	MiniMapLFGFrameBorder:SetTexture(nil)
-	MiniMapLFGFrame.eye.texture:SetTexture(addon._dir..'uigroupfinderflipbookeye.tga')
-end)
+-- Dungeon finder eye sits on the minimap ring, same size as the other minimap icons,
+-- with the shared yellow circle. The flipbook art only fills the middle of each cell,
+-- so the eye frame is larger than the button and the ring draws in the padding.
+local function PlaceMinimapLFG()
+	local f = MiniMapLFGFrame
+	if not f then return end
+	f:SetParent(Minimap)
+	f:SetScale(1)
+	f:SetSize(21, 21)
+	f:SetFrameStrata("HIGH")
+	f:SetFrameLevel((Minimap:GetFrameLevel() or 1) + 8)
+	f:SetClearPoint("CENTER", Minimap, "LEFT", 0, -20)
+
+	local border = _G.MiniMapLFGFrameBorder
+	if border then
+		border:SetTexture(addon._dir .. "border_buttons.tga")
+		border:ClearAllPoints()
+		border:SetPoint("CENTER", f, "CENTER", 0, 0)
+		border:SetSize(23, 23)
+		border:SetDrawLayer("OVERLAY")
+		border:Show()
+	end
+
+	local eye = f.eye
+	if eye then
+		if eye.SetSize then eye:SetSize(26, 26) end
+		if eye.ClearAllPoints then
+			eye:ClearAllPoints()
+			eye:SetPoint("CENTER", f, "CENTER", 0, 0)
+		end
+		if eye.texture then
+			eye.texture:SetTexture(addon._dir .. "uigroupfinderflipbookeye.tga")
+			eye.texture:ClearAllPoints()
+			eye.texture:SetSize(26, 26)
+			eye.texture:SetPoint("CENTER", f, "CENTER", 0, 0)
+		end
+	end
+end
+
+hooksecurefunc("MiniMapLFG_UpdateIsShown", PlaceMinimapLFG)
+PlaceMinimapLFG()
 
 MiniMapLFGFrame:SetScript('OnClick',function(self, button)
 	local mode, submode = GetLFGMode();
@@ -279,9 +354,9 @@ end
 
 function MainMenuMicroButtonMixin:CreateBar()
 	local latencybar = CreateFrame('Statusbar', nil, UIParent)
-	latencybar:SetParent(HelpMicroButton)
+	latencybar:SetParent(MainMenuMicroButton)
 	latencybar:SetSize(14, 39)
-	latencybar:SetPoint('BOTTOM', HelpMicroButton, 'BOTTOM', 0, -4)
+	latencybar:SetPoint('BOTTOM', MainMenuMicroButton, 'BOTTOM', 0, -4)
 	latencybar:SetStatusBarTexture(addon._dir..'ui-mainmenubar-performancebar')
 	latencybar:SetStatusBarColor(1, 1, 0)
 	latencybar:GetStatusBarTexture():SetBlendMode('ADD')
@@ -296,11 +371,41 @@ local function setupMicroButtons(xOffset)
 	menu:SetScale(config.micromenu.scale_menu)
 	menu:SetSize(10, 10)
 	menu:SetPoint('BOTTOMLEFT', UIParent, 'BOTTOMRIGHT', xOffset-2, config.micromenu.y_position)
+
+	-- Quest log is on the map; keep Blizzard's micro button permanently out of the strip.
+	if QuestLogMicroButton then
+		QuestLogMicroButton:Hide()
+		QuestLogMicroButton:UnregisterAllEvents()
+		QuestLogMicroButton:SetParent(UIParent)
+		QuestLogMicroButton:ClearAllPoints()
+		QuestLogMicroButton:SetPoint('TOPLEFT', UIParent, 'TOPLEFT', -5000, 0)
+		hooksecurefunc(QuestLogMicroButton, 'Show', function(self) self:Hide() end)
+	end
+	if HelpMicroButton then
+		HelpMicroButton:Hide()
+		HelpMicroButton:UnregisterAllEvents()
+		HelpMicroButton:SetParent(UIParent)
+		HelpMicroButton:ClearAllPoints()
+		HelpMicroButton:SetPoint('TOPLEFT', UIParent, 'TOPLEFT', -5000, 0)
+		hooksecurefunc(HelpMicroButton, 'Show', function(self) self:Hide() end)
+	end
+
 	for _,button in pairs(MICRO_BUTTONS) do
+		if not button or button.drakeishUISuppressed then
+			-- skip
+		else
 		local buttonName = button:GetName():gsub('MicroButton', '')
 		local name = strlower(buttonName);
+		button._drakeishMicroName = name
 
 		button:texture_strip()
+
+		-- TalentMicroButtonFlash is a separate ADD texture; leave it cleared so it
+		-- cannot cover the real highlight (same idea as stripping other regions).
+		if button == _G.TalentMicroButton and _G.TalentMicroButtonFlash then
+			_G.TalentMicroButtonFlash:SetTexture(nil)
+			_G.TalentMicroButtonFlash:Hide()
+		end
 
 		CharacterMicroButton:SetDisabledTexture'' -- doesn't exist by default
 		PVPMicroButton:SetDisabledTexture'' -- doesn't exist by default
@@ -313,22 +418,58 @@ local function setupMicroButtons(xOffset)
 		button.SetPoint = addon._noop
 		button:SetHitRectInsets(0,0,0,0)
 
+		-- Ensure texture slots exist before atlas (custom buttons / stripped regions).
+		button:SetNormalTexture''
+		button:SetPushedTexture''
+		button:SetDisabledTexture''
 		button:GetNormalTexture():set_atlas('ui-hud-micromenu-'..name..'-up-2x')
 		button:GetPushedTexture():set_atlas('ui-hud-micromenu-'..name..'-down-2x')
 		button:GetDisabledTexture():set_atlas('ui-hud-micromenu-'..name..'-disabled-2x')
-		button:GetHighlightTexture():set_atlas('ui-hud-micromenu-'..name..'-mouseover-2x')
-		button:GetHighlightTexture():SetBlendMode('ADD')
+		-- Same pattern as bag buttons: reset highlight slot, atlas, ADD, pin to button
+		button:SetHighlightTexture''
+		local highlight = button:GetHighlightTexture()
+		highlight:set_atlas('ui-hud-micromenu-'..name..'-mouseover-2x')
+		highlight:SetBlendMode('ADD')
+		highlight:ClearAllPoints()
+		highlight:SetAllPoints(button)
+
+		-- Talent: keep binding tooltip text fresh and use an OnEnter that works when
+		-- IsEnabled() returns a boolean (ClassicAPI) instead of 1/0 (stock XML used == 1).
+		if button == _G.TalentMicroButton then
+			local function refreshTalentTip()
+				if MicroButtonTooltipText then
+					button.tooltipText = MicroButtonTooltipText(TALENTS_BUTTON, "TOGGLETALENTS")
+				else
+					button.tooltipText = TALENTS_BUTTON or "Talents"
+				end
+				button.newbieText = NEWBIE_TOOLTIP_TALENTS or button.newbieText
+			end
+			refreshTalentTip()
+			button:SetScript("OnEnter", function(self)
+				refreshTalentTip()
+				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+				if GameTooltip_AddNewbieTip then
+					GameTooltip_AddNewbieTip(self, self.tooltipText, 1.0, 1.0, 1.0, self.newbieText)
+				else
+					GameTooltip:SetText(self.tooltipText or TALENTS_BUTTON or "Talents", 1, 1, 1)
+					if self.newbieText then
+						GameTooltip:AddLine(self.newbieText, NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b, true)
+					end
+					GameTooltip:Show()
+				end
+			end)
+			button:SetScript("OnLeave", function() GameTooltip:Hide() end)
+		end
 
 		buttonxOffset = buttonxOffset + 15
+		end
 	end
 end
 
 addon.package:RegisterEvents(function()
-	local xOffset
-	if IsAddOnLoaded('ezCollections') then
-		xOffset = -180
-		_G.CollectionsMicroButton:UnregisterEvent('UPDATE_BINDINGS')
-	else
+	local xOffset = -166
+	if _G.CollectionsMicroButton and not _G.CollectionsMicroButton.drakeishUISuppressed then
+		-- same width as the old 10-button strip (quest log slot reused by collections)
 		xOffset = -166
 	end
 	setupMicroButtons(xOffset + config.micromenu.x_position);
@@ -373,17 +514,19 @@ do
 	
 	bagsToggleButton:SetScript('OnClick',function(self)
 		local checked = self:GetChecked();
+		-- Update state first so Show/Hide hooks see the correct value
+		bags_state = checked and 1 or 0
 		if checked then
 			normal:set_atlas('bag-arrow-2x')
 			pushed:set_atlas('bag-arrow-2x')
 			highlight:set_atlas('bag-arrow-2x')
 			MainMenuBarBackpackButton:Hide()
-			-- Show micromenu buttons
+			-- Hide micromenu buttons
 			for _, button in pairs(MICRO_BUTTONS) do
-				button:Hide()
+				if button then button:Hide() end
 			end
 			
-			-- Show bags only if they are currently expanded (collapse_state == 1)
+			-- Hide bags only if they are currently expanded (collapse_state == 1)
 			if collapse_state == 1 then
 				for _, bag in pairs(bagslots) do
 					bag:Hide()
@@ -394,20 +537,18 @@ do
 			pushed:set_atlas('bag-arrow-invert-2x')
 			highlight:set_atlas('bag-arrow-invert-2x')
 			MainMenuBarBackpackButton:Show()
-			-- Hide micromenu buttons
+			-- Show micromenu buttons
 			for _, button in pairs(MICRO_BUTTONS) do
-				button:Show()
+				if button then button:Show() end
 			end
 			
-			-- Hide bags only if they are currently expanded (collapse_state == 1)
+			-- Show bags only if they are currently expanded (collapse_state == 1)
 			if collapse_state == 1 then
 				for _, bag in pairs(bagslots) do
 					bag:Show()
 				end
 			end
 		end
-		bags_state = checked and 1 or 0
-		-- print("bags_state saved as:", bags_state) -- Debug line
 	end)
 	
 	-- Add mouseover effects to match other toggle button
@@ -418,17 +559,194 @@ do
 		self:SetAlpha(0.3)
 	end)
 	
+	-- Blizzard (esp. TalentMicroButton via UpdateMicroButtons) re-Shows buttons;
+	-- keep them hidden while micromenu toggle is off.
+	local function EnforceMicroMenuHidden()
+		if bags_state ~= 1 then return end
+		for _, button in pairs(MICRO_BUTTONS) do
+			if button and button:IsShown() then
+				button:Hide()
+			end
+		end
+	end
+
+	for _, button in pairs(MICRO_BUTTONS) do
+		if button then
+			hooksecurefunc(button, 'Show', function(self)
+				if bags_state == 1 then
+					self:Hide()
+				end
+			end)
+		end
+	end
+
+	if UpdateMicroButtons then
+		hooksecurefunc('UpdateMicroButtons', EnforceMicroMenuHidden)
+	end
+	if UpdateMicroButtonsParent then
+		hooksecurefunc('UpdateMicroButtonsParent', EnforceMicroMenuHidden)
+	end
+
+	-- Stock UpdateMicroButtons only knows FriendsFrame / LFDParentFrame / PlayerTalentFrame /
+	-- PVPParentFrame. Social, LFG, Adventure Guide, and PvP use custom DrakeishUI frames. Also:
+	-- atlas-skinned NormalTextures do not always follow SetButtonState on this client (Talent),
+	-- so paint the down/up atlas onto NormalTexture explicitly while the panel is open.
+	local function IsBtnEnabled(button)
+		if not button or not button.IsEnabled then return false end
+		local e = button:IsEnabled()
+		return e == 1 or e == true
+	end
+
+	local function ApplyMicroOpenArt(button, open)
+		if not button or not button._drakeishMicroName then return end
+		local name = button._drakeishMicroName
+		local suffix = open and '-down-2x' or '-up-2x'
+		local nt = button:GetNormalTexture()
+		if nt and nt.set_atlas then
+			nt:set_atlas('ui-hud-micromenu-' .. name .. suffix)
+		end
+		-- Always refresh the pushed slot too — some clients keep showing Normal while locked.
+		local pt = button:GetPushedTexture()
+		if pt and pt.set_atlas then
+			pt:set_atlas('ui-hud-micromenu-' .. name .. '-down-2x')
+		end
+		if open then
+			button:SetButtonState("PUSHED", 1)
+		else
+			button:SetButtonState("NORMAL")
+		end
+	end
+
+	local WireOpenState, WireKnownOpenFrames
+
+	local function SyncOpenMicroButtons()
+		-- Wire lazily-created frames (Adventure Guide / Talent) so close/hide clears art too.
+		WireKnownOpenFrames()
+
+		local social = _G.DrakeishUI_Social_FriendsFrame
+		if SocialsMicroButton then
+			ApplyMicroOpenArt(SocialsMicroButton, social and social:IsShown())
+		end
+
+		local lfg = _G.DrakeishUI_Social_GroupFinderFrame
+		if LFDMicroButton and IsBtnEnabled(LFDMicroButton) then
+			ApplyMicroOpenArt(LFDMicroButton, lfg and lfg:IsShown())
+		end
+
+		local journal = _G.DrakeishUI_Social_EncounterJournal
+		if AdventureGuideMicroButton then
+			ApplyMicroOpenArt(AdventureGuideMicroButton, journal and journal:IsShown())
+		end
+
+		local pvp = _G.DrakeishUI_Social_PVPFrame
+		if PVPMicroButton and IsBtnEnabled(PVPMicroButton) then
+			ApplyMicroOpenArt(PVPMicroButton, pvp and pvp:IsShown())
+		end
+
+		if TalentMicroButton and IsBtnEnabled(TalentMicroButton) then
+			local talentOpen = PlayerTalentFrame and PlayerTalentFrame:IsShown()
+			ApplyMicroOpenArt(TalentMicroButton, talentOpen and true or false)
+		end
+	end
+	addon.SyncOpenMicroButtons = SyncOpenMicroButtons
+
+	local function RefreshMicroButtons()
+		if UpdateMicroButtons then UpdateMicroButtons() end
+		SyncOpenMicroButtons()
+	end
+
+	function WireOpenState(frame)
+		if not frame or frame._drakeishMicroOpenWired then return end
+		frame._drakeishMicroOpenWired = true
+		frame:HookScript("OnShow", function()
+			SyncOpenMicroButtons()
+			-- Talent UIPanel show can lag one frame behind the click.
+			if C_Timer and C_Timer.After then
+				C_Timer.After(0, SyncOpenMicroButtons)
+			end
+		end)
+		frame:HookScript("OnHide", function()
+			SyncOpenMicroButtons()
+			if C_Timer and C_Timer.After then
+				C_Timer.After(0, SyncOpenMicroButtons)
+			end
+		end)
+	end
+
+	function WireKnownOpenFrames()
+		WireOpenState(_G.DrakeishUI_Social_FriendsFrame)
+		WireOpenState(_G.DrakeishUI_Social_GroupFinderFrame)
+		WireOpenState(_G.DrakeishUI_Social_EncounterJournal)
+		WireOpenState(_G.DrakeishUI_Social_PVPFrame)
+		WireOpenState(_G.PlayerTalentFrame)
+	end
+
+	if UpdateMicroButtons then
+		hooksecurefunc('UpdateMicroButtons', function()
+			WireKnownOpenFrames()
+			SyncOpenMicroButtons()
+		end)
+	end
+
+	if type(TalentFrame_LoadUI) == "function" then
+		hooksecurefunc("TalentFrame_LoadUI", function()
+			WireOpenState(_G.PlayerTalentFrame)
+			if C_Timer and C_Timer.After then
+				C_Timer.After(0, SyncOpenMicroButtons)
+			end
+		end)
+	end
+
+	-- Talent panel is a UIPanel — catch show/hide even when OnShow wiring races LoadUI.
+	if type(ShowUIPanel) == "function" then
+		hooksecurefunc("ShowUIPanel", function(frame)
+			if frame and frame == _G.PlayerTalentFrame then
+				WireOpenState(frame)
+				SyncOpenMicroButtons()
+				if C_Timer and C_Timer.After then
+					C_Timer.After(0, SyncOpenMicroButtons)
+				end
+			end
+		end)
+	end
+	if type(HideUIPanel) == "function" then
+		hooksecurefunc("HideUIPanel", function(frame)
+			if frame and frame == _G.PlayerTalentFrame then
+				SyncOpenMicroButtons()
+				if C_Timer and C_Timer.After then
+					C_Timer.After(0, SyncOpenMicroButtons)
+				end
+			end
+		end)
+	end
+
+	if TalentMicroButton then
+		TalentMicroButton:HookScript("OnClick", function()
+			WireOpenState(_G.PlayerTalentFrame)
+			SyncOpenMicroButtons()
+			if C_Timer and C_Timer.After then
+				C_Timer.After(0, SyncOpenMicroButtons)
+			end
+		end)
+	end
+
+	addon.package:RegisterEvents(function(self, event)
+		self:UnregisterEvent(event)
+		WireKnownOpenFrames()
+		SyncOpenMicroButtons()
+	end, 'PLAYER_LOGIN')
+	
 	addon.package:RegisterEvents(function(self, event)
 		self:UnregisterEvent(event)
 		if not bags_state then bags_state = 0 end
 		if bags_state == 1 then
 		    MainMenuBarBackpackButton:Hide()
-			-- Show micromenu buttons
+			-- Hide micromenu buttons
 			for _, button in pairs(MICRO_BUTTONS) do
-				button:Hide()
+				if button then button:Hide() end
 			end
 			
-			-- Show bags only if they are currently expanded (collapse_state == 1)
+			-- Hide bags only if they are currently expanded (collapse_state == 1)
 			if collapse_state == 1 then
 				for _, bag in pairs(bagslots) do
 					bag:Hide()
@@ -441,12 +759,12 @@ do
 			bagsToggleButton:SetChecked(1)
 		else
 		    MainMenuBarBackpackButton:Show()
-			-- Hide micromenu buttons
+			-- Show micromenu buttons
 			for _, button in pairs(MICRO_BUTTONS) do
-				button:Show()
+				if button then button:Show() end
 			end
 			
-			-- Hide bags only if they are currently expanded (collapse_state == 1)
+			-- Show bags only if they are currently expanded (collapse_state == 1)
 			if collapse_state == 1 then
 				for _, bag in pairs(bagslots) do
 					bag:Show()

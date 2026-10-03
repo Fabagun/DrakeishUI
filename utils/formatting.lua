@@ -49,22 +49,93 @@ do
 end
 addon.GetKeyText = GetKeyText
 
--- returns formatted time as a string.
--- @param time - a time in seconds
---[[
-function addon:formatTime(time)
-	local day = floor((time / 86400) + .5)
-	local hour = time >= 3570 and floor((time / 3600) + .5) or 0
-	local minute = floor((time / 60) + .5)
-	local second = time
+-- Blizzard Interface > Status Text (WotLK 3.3.5)
+-- CVars: playerStatusText / petStatusText / partyStatusText / targetStatusText (0|1)
+--        statusTextPercentage (0 = numeric, 1 = percent)
+local STATUS_TEXT_CVARS = {
+	playerStatusText = true,
+	petStatusText = true,
+	partyStatusText = true,
+	targetStatusText = true,
+	statusTextPercentage = true,
+}
 
-	if day > 0 then
-		return ('%1dd'):format(day)
-	elseif hour > 0 then
-		return ('%1dh'):format(hour)
-	elseif minute > 0 and second > 59 then
-		return ('%1dm'):format(minute)
+local statusTextListeners = {}
+
+function addon.StatusTextIsShown(kind)
+	local cvar = kind .. "StatusText"
+	local ok, value = pcall(GetCVar, cvar)
+	if not ok or value == nil then
+		return true
 	end
-	return ('%1ds'):format(second)
+	return tostring(value) == "1"
 end
-]]
+
+-- Blizzard TextStatusBar: CVar on = always show; CVar off = show only while hovering.
+function addon.StatusTextVisible(kind, hovering)
+	if addon.StatusTextIsShown(kind) then
+		return true
+	end
+	return hovering and true or false
+end
+
+function addon.StatusTextUsePercent()
+	if GetCVarBool then
+		local ok, value = pcall(GetCVarBool, "statusTextPercentage")
+		if ok then return value and true or false end
+	end
+	local ok, value = pcall(GetCVar, "statusTextPercentage")
+	if not ok or value == nil then
+		return false
+	end
+	return tostring(value) == "1"
+end
+
+function addon.FormatStatusText(current, maxValue, usePercent)
+	current = tonumber(current) or 0
+	maxValue = tonumber(maxValue) or 0
+	if usePercent then
+		if maxValue <= 0 then return "0%" end
+		return math.floor((current / maxValue) * 100 + 0.5) .. "%"
+	end
+	local curStr, maxStr = tostring(math.floor(current + 0.5)), tostring(math.floor(maxValue + 0.5))
+	if TextStatusBar_CapDisplayOfNumericValue then
+		curStr = TextStatusBar_CapDisplayOfNumericValue(curStr)
+		maxStr = TextStatusBar_CapDisplayOfNumericValue(maxStr)
+	end
+	return curStr .. " / " .. maxStr
+end
+
+function addon.RegisterStatusTextListener(fn)
+	if type(fn) == "function" then
+		table.insert(statusTextListeners, fn)
+	end
+end
+
+function addon.NotifyStatusTextListeners()
+	for i = 1, #statusTextListeners do
+		pcall(statusTextListeners[i])
+	end
+end
+
+_G.DrakeishUI_StatusTextIsShown = addon.StatusTextIsShown
+_G.DrakeishUI_StatusTextVisible = addon.StatusTextVisible
+_G.DrakeishUI_StatusTextUsePercent = addon.StatusTextUsePercent
+_G.DrakeishUI_FormatStatusText = addon.FormatStatusText
+_G.DrakeishUI_RegisterStatusTextListener = addon.RegisterStatusTextListener
+_G.DrakeishUI_NotifyStatusTextListeners = addon.NotifyStatusTextListeners
+
+local statusTextWatcher = CreateFrame("Frame")
+statusTextWatcher:RegisterEvent("CVAR_UPDATE")
+statusTextWatcher:RegisterEvent("PLAYER_ENTERING_WORLD")
+statusTextWatcher:SetScript("OnEvent", function(self, event, cvar)
+	if event == "PLAYER_ENTERING_WORLD" then
+		addon.NotifyStatusTextListeners()
+		return
+	end
+	-- WotLK may pass CVar name or STATUS_TEXT_* label
+	local key = cvar and tostring(cvar) or ""
+	if key == "" or STATUS_TEXT_CVARS[key] or string.find(string.lower(key), "status") then
+		addon.NotifyStatusTextListeners()
+	end
+end)

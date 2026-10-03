@@ -1,4 +1,4 @@
-﻿-- Author      : John Rubin - "Mistra50"
+-- Author      : John Rubin - "Mistra50"
 -- Create Date : 8/8/2012 9:03:35 PM
 -- Mistra's D3Orbs - rewrite of the previous oUF_D3Orbs_LightWeight
 -- The orbs originally appeared in the RothUI by "Zork" and permissive use of all assets and code was given by the original author. 
@@ -24,7 +24,10 @@
 D32localizedDisplayName, D32className, D32classNumber = UnitClass("player")
 local charClassNumber = 0
 local playerInVehicle --bool for detecting whether or not a player is in a vehicle
-local defaultOrbSize = 150
+local defaultOrbSize = 120 -- 20% smaller than original 150
+-- Sit on the bottom screen edge (BOTTOM-anchored); pet orb follows healthOrb
+local defaultOrbY = 0
+local defaultPetOrbSize = 87 -- restored to original size
 local orbFillingTexture = "MDO_orb_filling8.tga"
 local fillRotationTexture = "orb_fillRotation"
 local images = "Interface\\AddOns\\DrakeishUI\\modules\\MistrasDiabloOrbs\\images\\"
@@ -70,26 +73,97 @@ local fontChoices = {
 
 
 
-local function getClassColor()
-	if D32classNumber then
-		D32className = D32localizedDisplayName
-		return D32classNumber - 1
-	else
-		local num = table.getn(orbClassColors)
-		for i=0,num,1 do
-		if orbClassColors[i].name == UnitClass("player") then
-			D32className = UnitClass("player")
-			return i 
+-- Presets are keyed by the English class file, not by class id.
+-- On this client class 10 is Guardian and class 13 is Demon Hunter, so
+-- classId-1 lands on the Monk slot or off the end of the table.
+local PRESET_BY_CLASS_FILE = {
+	WARRIOR = 0,
+	PALADIN = 1,
+	HUNTER = 2,
+	ROGUE = 3,
+	PRIEST = 4,
+	DEATHKNIGHT = 5,
+	SHAMAN = 6,
+	MAGE = 7,
+	WARLOCK = 8,
+	DRUID = 10,
+}
+
+local function matchingPresetIndex()
+	local localized, classFile, classId = UnitClass("player")
+	if localized then
+		D32localizedDisplayName = localized
+		D32className = localized
+	end
+	if classId then
+		D32classNumber = classId
+	end
+	if classFile and PRESET_BY_CLASS_FILE[classFile] ~= nil then
+		return PRESET_BY_CLASS_FILE[classFile]
+	end
+	if localized then
+		for i = 0, 10 do
+			if orbClassColors[i] and orbClassColors[i].name == localized then
+				return i
+			end
 		end
 	end
-	return 0
+	return nil
+end
+
+-- Color of the player's current power, using the same sources as the power bar.
+-- A class token registered in PowerBarColor wins (Demon Hunter Fury).
+-- Guardian repaints the mana bar teal after the stock mana lookup, so that
+-- painted bar color is used when the class module is present.
+local function PlayerPowerOrbColor()
+	local isGuardian = type(_G.ClasslessIsGuardianPlayerFrame) == "function" and _G.ClasslessIsGuardianPlayerFrame()
+	if isGuardian and type(_G.ClasslessApplyGuardianManaBarColor) == "function" then
+		_G.ClasslessApplyGuardianManaBarColor()
+		local bar = _G.PlayerFrameManaBar
+		if bar and bar.GetStatusBarColor then
+			local r, g, b, a = bar:GetStatusBarColor()
+			if r and g and b then
+				return r, g, b, a or 1
+			end
+		end
 	end
+	local powerType, powerToken, altR, altG, altB = UnitPowerType("player")
+	local info = powerToken and PowerBarColor[powerToken]
+	if info then
+		return info.r, info.g, info.b, info.a or 1
+	end
+	if altR then
+		return altR, altG or 0, altB or 0, 1
+	end
+	if powerType ~= nil and PowerBarColor[powerType] then
+		info = PowerBarColor[powerType]
+	else
+		info = PowerBarColor["MANA"]
+	end
+	if info then
+		return info.r, info.g, info.b, info.a or 1
+	end
+	return 0, 0.44, 0.87, 1
+end
+
+local function getClassColor()
+	local preset = matchingPresetIndex()
+	if preset ~= nil then
+		return preset
+	end
+	return 0
 end
 charClassNumber = getClassColor()
+local powerUsesLiveColor = matchingPresetIndex() == nil
 
 --load preset D32CharacterData default in the event existing data cannot be recovered
 local Hr,Hg,Hb,Ha = orbClassColors[charClassNumber].health.r, orbClassColors[charClassNumber].health.g, orbClassColors[charClassNumber].health.b, orbClassColors[charClassNumber].health.a
-local Mr,Mg,Mb,Ma = orbClassColors[charClassNumber].mana.r, orbClassColors[charClassNumber].mana.g, orbClassColors[charClassNumber].mana.b, orbClassColors[charClassNumber].mana.a
+local Mr,Mg,Mb,Ma
+if powerUsesLiveColor then
+	Mr, Mg, Mb, Ma = PlayerPowerOrbColor()
+else
+	Mr, Mg, Mb, Ma = orbClassColors[charClassNumber].mana.r, orbClassColors[charClassNumber].mana.g, orbClassColors[charClassNumber].mana.b, orbClassColors[charClassNumber].mana.a
+end
 
 local defaultsTable = {
 	--health orb vars - always red
@@ -161,6 +235,82 @@ function handlePlayerFrame(show)
 		PlayerFrame:SetScript("OnEvent",nil)
 		PlayerFrame:Hide()
 	end
+end
+
+-- Default PetFrame is a PlayerFrame child, so it stays hidden while Diablo orbs hide PlayerFrame.
+-- When the pet orb is off (and Diablo orbs are on), show Blizzard PetFrame on UIParent instead.
+local petFrameForcedHidden = false
+
+local function RefreshBlizzardPetFrame()
+	if not PetFrame then return end
+
+	local orbsActive = (_G.diablo_orbs_state == 1)
+	local petOrbEnabled = D32CharacterData and D32CharacterData.petOrb and D32CharacterData.petOrb.enabled
+	local hidePetFrame = (_G.hide_pet_frame_state or 0) == 1
+
+	-- Explicit "Toggle Pet Frame" hide always wins
+	if hidePetFrame then
+		petFrameForcedHidden = true
+		PetFrame:Hide()
+		if _G.UpdatePartyFramePositions then
+			_G.UpdatePartyFramePositions()
+		end
+		return
+	end
+
+	-- Raid frames own a rectangular pet unit; keep Blizzard PetFrame hidden.
+	if _G.DrakeishUI_ShouldShowRaidStylePet and _G.DrakeishUI_ShouldShowRaidStylePet() then
+		petFrameForcedHidden = true
+		PetFrame:Hide()
+		if _G.UpdatePartyFramePositions then
+			_G.UpdatePartyFramePositions()
+		end
+		return
+	end
+
+	if orbsActive and petOrbEnabled then
+		petFrameForcedHidden = true
+		PetFrame:Hide()
+	elseif orbsActive and not petOrbEnabled then
+		petFrameForcedHidden = false
+		PetFrame:SetParent(UIParent)
+		PetFrame:ClearAllPoints()
+		-- Above first party member (party is pushed down when pet exists)
+		PetFrame:SetPoint('TOPLEFT', UIParent, 'TOPLEFT', 11, -7)
+		PetFrame:SetFrameStrata('MEDIUM')
+		if UnitExists('pet') then
+			PetFrame:Show()
+			if PetFrame_Update then PetFrame_Update(PetFrame) end
+		else
+			PetFrame:Hide()
+		end
+	else
+		-- Diablo orbs off: restore normal PlayerFrame parenting
+		petFrameForcedHidden = false
+		PetFrame:SetParent(PlayerFrame)
+		PetFrame:ClearAllPoints()
+		PetFrame:SetPoint('TOPLEFT', PlayerFrame, 'TOPLEFT', 80, -100)
+		if UnitExists('pet') then
+			PetFrame:Show()
+			if PetFrame_Update then PetFrame_Update(PetFrame) end
+		else
+			PetFrame:Hide()
+		end
+	end
+
+	if _G.UpdatePartyFramePositions then
+		_G.UpdatePartyFramePositions()
+	end
+end
+
+_G.RefreshBlizzardPetFrame = RefreshBlizzardPetFrame
+
+if PetFrame then
+	hooksecurefunc(PetFrame, 'Show', function(self)
+		if petFrameForcedHidden then
+			self:Hide()
+		end
+	end)
 end
 
 --hide the player frame by default... we have a pet orb now, so people shouldn't be asking for it anymore.... maybe
@@ -247,21 +397,33 @@ function monitorHealth(orb)
 	local string1 = math.floor(newDisplayPercentage*100)
 	if tonumber(string1) == nil then string1 = 0 end
 	
-	-- Only show text when player is selected (targeted)
-	if UnitIsUnit("player", "target") then
-		-- Show fonts based on saved settings (monitorHealth is always called with healthOrb)
-		if D32CharacterData and D32CharacterData.healthOrb then
-			if D32CharacterData.healthOrb.font1.show then orb.font1:Show() else orb.font1:Hide() end
-			if D32CharacterData.healthOrb.font2.show then orb.font2:Show() else orb.font2:Hide() end
-		else
+	-- Sync with Interface > Status Text (playerStatusText + statusTextPercentage)
+	-- CVar on = always show; CVar off = show while hovering (Blizzard style)
+	local showText = true
+	if DrakeishUI_StatusTextVisible then
+		showText = DrakeishUI_StatusTextVisible("player", orb.statusTextHover)
+	elseif DrakeishUI_StatusTextIsShown then
+		showText = DrakeishUI_StatusTextIsShown("player") or orb.statusTextHover
+	end
+	local usePercent = false
+	if DrakeishUI_StatusTextUsePercent then usePercent = DrakeishUI_StatusTextUsePercent() end
+	if showText then
+		if usePercent then
 			orb.font1:Show()
+			orb.font2:Hide()
+			orb.font1:SetText(tostring(string1))
+			orb.font2:SetText("")
+			if UnitIsDead(unitHealthString) then
+				orb.font1:SetText("DEAD")
+			end
+		else
+			orb.font1:Hide()
 			orb.font2:Show()
-		end
-		orb.font1:SetText(string1)
-		local string = valueFormat(currentHealth)
-		orb.font2:SetText(string)
-		if UnitIsDead(unitHealthString) then
-			orb.font2:SetText("DEAD :'(")
+			orb.font1:SetText("")
+			orb.font2:SetText(valueFormat(currentHealth))
+			if UnitIsDead(unitHealthString) then
+				orb.font2:SetText("DEAD :'(")
+			end
 		end
 	else
 		orb.font1:Hide()
@@ -322,21 +484,32 @@ function monitorPower(orb)
 	local string1 = math.floor(newDisplayPercentage*100)
 	if tonumber(string1) == nil then string1 = 0 end
 	
-	-- Only show text when player is selected (targeted)
-	if UnitIsUnit("player", "target") then
-		-- Show fonts based on saved settings (monitorPower is always called with manaOrb)
-		if D32CharacterData and D32CharacterData.manaOrb then
-			if D32CharacterData.manaOrb.font1.show then orb.font1:Show() else orb.font1:Hide() end
-			if D32CharacterData.manaOrb.font2.show then orb.font2:Show() else orb.font2:Hide() end
-		else
+	-- Sync with Interface > Status Text (playerStatusText + statusTextPercentage)
+	local showText = true
+	if DrakeishUI_StatusTextVisible then
+		showText = DrakeishUI_StatusTextVisible("player", orb.statusTextHover)
+	elseif DrakeishUI_StatusTextIsShown then
+		showText = DrakeishUI_StatusTextIsShown("player") or orb.statusTextHover
+	end
+	local usePercent = false
+	if DrakeishUI_StatusTextUsePercent then usePercent = DrakeishUI_StatusTextUsePercent() end
+	if showText then
+		if usePercent then
 			orb.font1:Show()
+			orb.font2:Hide()
+			orb.font1:SetText(tostring(string1))
+			orb.font2:SetText("")
+			if UnitIsDead(unitPowerString) then
+				orb.font1:SetText("DEAD")
+			end
+		else
+			orb.font1:Hide()
 			orb.font2:Show()
-		end
-		orb.font1:SetText(string1)
-		local string = valueFormat(currentPower)
-		orb.font2:SetText(string)
-		if UnitIsDead(unitPowerString) then
-			orb.font2:SetText("DEAD :'(")
+			orb.font1:SetText("")
+			orb.font2:SetText(valueFormat(currentPower))
+			if UnitIsDead(unitPowerString) then
+				orb.font2:SetText("DEAD :'(")
+			end
 		end
 	else
 		orb.font1:Hide()
@@ -396,12 +569,30 @@ local function PetHealthUpdate(orb)
 	local string1 = math.floor(newDisplayPercentage*100)
 	if tonumber(string1) == nil then string1 = 0 end
 	
-	-- Only show text when pet is selected (targeted)
-	if UnitIsUnit("pet", "target") then
-		orb.font1:SetText(string1)
-		local string = valueFormat(currentHealth,true)
-		orb.font3:SetText(string)
+	-- Sync with Interface > Status Text (petStatusText + statusTextPercentage)
+	local showText = true
+	if DrakeishUI_StatusTextVisible then
+		showText = DrakeishUI_StatusTextVisible("pet", orb.statusTextHover)
+	elseif DrakeishUI_StatusTextIsShown then
+		showText = DrakeishUI_StatusTextIsShown("pet") or orb.statusTextHover
+	end
+	local usePercent = false
+	if DrakeishUI_StatusTextUsePercent then usePercent = DrakeishUI_StatusTextUsePercent() end
+	if showText then
+		if usePercent then
+			orb.font1:Show()
+			orb.font3:Hide()
+			orb.font1:SetText(tostring(string1))
+			orb.font3:SetText("")
+		else
+			orb.font1:Hide()
+			orb.font3:Show()
+			orb.font1:SetText("")
+			orb.font3:SetText(valueFormat(currentHealth,true))
+		end
 	else
+		orb.font1:Hide()
+		orb.font3:Hide()
 		orb.font1:SetText("")
 		orb.font3:SetText("")
 	end
@@ -624,11 +815,26 @@ local function CreateOrb(parent,name,size,fillTexture,galaxyTexture,offsetX,offs
 	orb:SetAttribute("unit","player")
 	orb.tooltip = CreateFrame("GameTooltip","PlayerTooltip",nil,"GameToolTipTemplate")
 	orb:SetScript("OnEnter", function()
+		orb.statusTextHover = true
+		local usePercent = DrakeishUI_StatusTextUsePercent and DrakeishUI_StatusTextUsePercent()
+		if usePercent then
+			orb.font1:Show()
+			orb.font2:Hide()
+		else
+			orb.font1:Hide()
+			orb.font2:Show()
+		end
 		GameTooltip_SetDefaultAnchor(GameTooltip,UIParent)
 		GameTooltip:SetUnit("player")
 		GameTooltip:Show()
 	end)
 	orb:SetScript("OnLeave",function()
+		orb.statusTextHover = false
+		local showText = DrakeishUI_StatusTextIsShown and DrakeishUI_StatusTextIsShown("player")
+		if not showText then
+			orb.font1:Hide()
+			orb.font2:Hide()
+		end
 		GameTooltip:Hide()
 	end)
 
@@ -747,11 +953,26 @@ local function CreatePetOrb(parent,name,size,offsetX,offsetY,relativePoint,monit
 	orb:SetAttribute("unit","pet")
 	orb.tooltip = CreateFrame("GameTooltip","PetToolTip",nil,"GameToolTipTemplate")
 	orb:SetScript("OnEnter", function()
+		orb.statusTextHover = true
+		local usePercent = DrakeishUI_StatusTextUsePercent and DrakeishUI_StatusTextUsePercent()
+		if usePercent then
+			orb.font1:Show()
+			orb.font3:Hide()
+		else
+			orb.font1:Hide()
+			orb.font3:Show()
+		end
 		GameTooltip_SetDefaultAnchor(GameTooltip,UIParent)
 		GameTooltip:SetUnit("pet")
 		GameTooltip:Show()
 	end)
 	orb:SetScript("OnLeave",function()
+		orb.statusTextHover = false
+		local showText = DrakeishUI_StatusTextIsShown and DrakeishUI_StatusTextIsShown("pet")
+		if not showText then
+			orb.font1:Hide()
+			orb.font3:Hide()
+		end
 		GameTooltip:Hide()
 	end)
 	
@@ -1047,57 +1268,62 @@ end
 
 
 function checkPetFontPlacement()
-	-- Only show health fonts (font1 and font3), hide power fonts (font2 and font4)
-	-- Center fonts since we only show health
-	if D32CharacterData.petOrb.showValue and D32CharacterData.petOrb.showPercentage then
-		petOrb.font3:Show()
-		petOrb.font4:Hide()  -- Hide power value
-		petOrb.font1:Show()
-		petOrb.font2:Hide()  -- Hide power percentage
-		petOrb.font3:SetPoint("CENTER",0,7)  -- Center health value
-		petOrb.font1:SetPoint("CENTER",0,20)  -- Center health percentage
-		petOrb.font3:SetFont(D32CharacterData.font,9,"THINOUTLINE")
-	elseif D32CharacterData.petOrb.showValue and not D32CharacterData.petOrb.showPercentage then
-		petOrb.font3:Show()
-		petOrb.font4:Hide()  -- Hide power value
+	-- Drive visibility from Blizzard Status Text settings (+ mouseover)
+	local showText = true
+	if DrakeishUI_StatusTextVisible then
+		showText = DrakeishUI_StatusTextVisible("pet", petOrb and petOrb.statusTextHover)
+	elseif DrakeishUI_StatusTextIsShown then
+		showText = DrakeishUI_StatusTextIsShown("pet") or (petOrb and petOrb.statusTextHover)
+	end
+	local usePercent = false
+	if DrakeishUI_StatusTextUsePercent then usePercent = DrakeishUI_StatusTextUsePercent() end
+
+	petOrb.font2:Hide()
+	petOrb.font4:Hide()
+
+	if not showText then
 		petOrb.font1:Hide()
-		petOrb.font2:Hide()  -- Hide power percentage
-		petOrb.font3:SetPoint("CENTER",0,0)  -- Center health value
-		petOrb.font3:SetFont(D32CharacterData.font,11 * petOrb:GetScale(),"THINOUTLINE")
-	elseif not D32CharacterData.petOrb.showValue and D32CharacterData.petOrb.showPercentage then
-		petOrb.font1:Show()
-		petOrb.font2:Hide()  -- Hide power percentage
 		petOrb.font3:Hide()
-		petOrb.font4:Hide()  -- Hide power value
-		petOrb.font1:SetPoint("CENTER",0,0)  -- Center health percentage
+		return
+	end
+
+	if usePercent then
+		petOrb.font1:Show()
+		petOrb.font3:Hide()
+		petOrb.font1:SetPoint("CENTER",0,0)
 	else
 		petOrb.font1:Hide()
-		petOrb.font2:Hide()
-		petOrb.font3:Hide()
-		petOrb.font4:Hide()
+		petOrb.font3:Show()
+		petOrb.font3:SetPoint("CENTER",0,0)
+		petOrb.font3:SetFont(D32CharacterData.font,11 * petOrb:GetScale(),"THINOUTLINE")
 	end
 end
 
 function setOrbFontPlacement(orb,orbData)
-	-- Hide fonts by default - they will be shown when player is selected (in monitorHealth/monitorPower)
-	orb.font1:Hide()
-	orb.font2:Hide()
-	if orbData.font1.show and orbData.font2.show then
-		orb.font1:SetFont(D32CharacterData.font,28,"THINOUTLINE")
-		orb.font2:SetFont(D32CharacterData.font,16,"THINOUTLINE")
-		orb.font1:SetPoint("CENTER",0,35)
-		orb.font2:SetPoint("CENTER",0,15)
-	elseif orbData.font1.show and not orbData.font2.show then
+	-- Drive placement from Blizzard Status Text settings (+ mouseover)
+	local showText = true
+	if DrakeishUI_StatusTextVisible then
+		showText = DrakeishUI_StatusTextVisible("player", orb.statusTextHover)
+	elseif DrakeishUI_StatusTextIsShown then
+		showText = DrakeishUI_StatusTextIsShown("player") or orb.statusTextHover
+	end
+	local usePercent = false
+	if DrakeishUI_StatusTextUsePercent then usePercent = DrakeishUI_StatusTextUsePercent() end
+
+	if not showText then
+		orb.font1:Hide()
+		orb.font2:Hide()
+		return
+	end
+
+	if usePercent then
 		orb.font1:SetFont(D32CharacterData.font,28,"THINOUTLINE")
 		orb.font1:SetPoint("CENTER",0,20)
 		orb.font2:Hide()
-	elseif orbData.font2.show and not orbData.font1.show then
+	else
 		orb.font2:SetFont(D32CharacterData.font,25,"THINOUTLINE")
 		orb.font2:SetPoint("CENTER",0,20)
 		orb.font1:Hide()
-	else
-		orb.font1:Hide()
-		orb.font2:Hide()
 	end
 end
 
@@ -1147,13 +1373,27 @@ function checkDefaultsFromMemory()
 	-- Ensure mana orb uses class colors
 	if not D32CharacterData.manaOrb.orbColor then D32CharacterData.manaOrb.orbColor = {r = Mr, g = Mg, b = Mb, a = Ma} end
 	if not D32CharacterData.manaOrb.galaxy then D32CharacterData.manaOrb.galaxy = {r = Mr, g = Mg, b = Mb, a = Ma} end
-	-- Update mana orb colors to current class colors
+	-- Known classes keep their preset. Any other class follows its live power color.
+	local presetNow = matchingPresetIndex()
+	if presetNow ~= nil then
+		powerUsesLiveColor = false
+		charClassNumber = presetNow
+		Mr = orbClassColors[presetNow].mana.r
+		Mg = orbClassColors[presetNow].mana.g
+		Mb = orbClassColors[presetNow].mana.b
+		Ma = orbClassColors[presetNow].mana.a
+	else
+		powerUsesLiveColor = true
+		Mr, Mg, Mb, Ma = PlayerPowerOrbColor()
+	end
 	D32CharacterData.manaOrb.orbColor.r = Mr
 	D32CharacterData.manaOrb.orbColor.g = Mg
 	D32CharacterData.manaOrb.orbColor.b = Mb
+	D32CharacterData.manaOrb.orbColor.a = Ma
 	D32CharacterData.manaOrb.galaxy.r = Mr
 	D32CharacterData.manaOrb.galaxy.g = Mg
 	D32CharacterData.manaOrb.galaxy.b = Mb
+	D32CharacterData.manaOrb.galaxy.a = Ma
 	if D32CharacterData.manaOrb.font1.show == nil then D32CharacterData.manaOrb.font1.show = defaultsTable.manaOrb.font1.show end
 	if D32CharacterData.manaOrb.font2.show == nil then D32CharacterData.manaOrb.font2.show = defaultsTable.manaOrb.font2.show end
 	if not D32CharacterData.druidColors then D32CharacterData.druidColors = defaultsTable.druidColors end
@@ -1190,6 +1430,9 @@ function checkDefaultsFromMemory()
 	if not D32CharacterData.petOrb.enabled then
 	 UnregisterUnitWatch(petOrb) 
 	 petOrb:Hide()
+	end
+	if RefreshBlizzardPetFrame then
+		RefreshBlizzardPetFrame()
 	end
 	if not D32CharacterData.artwork.show then
 		angelFrame:Hide()
@@ -1450,11 +1693,12 @@ function FillXMLTemplate(frame)
 end
 
 --alloc the orbs and assign them to the health/mana orb variables, make them both movable from the get-go for testing
-healthOrb = CreateOrb(nil,"D32_HealthOrb",defaultOrbSize,defaultTextures.healthOrb.fill,defaultTextures.healthOrb.rotation,-340,0,"BOTTOM",monitorHealth)
-manaOrb = CreateOrb(nil,"D32_ManaOrb",defaultOrbSize,defaultTextures.manaOrb.fill,defaultTextures.manaOrb.rotation,340,0,"BOTTOM",monitorPower)
--- Pet orb positioned at bottom like main orbs: healthOrb is at -340, pet orb was at -95 relative to healthOrb center
--- So absolute X position is approximately -340 + (-95) = -435
-petOrb = CreatePetOrb(nil,"D32_PetOrb",87,-465,0,"BOTTOM",nil)
+healthOrb = CreateOrb(nil,"D32_HealthOrb",defaultOrbSize,defaultTextures.healthOrb.fill,defaultTextures.healthOrb.rotation,-340,defaultOrbY,"BOTTOM",monitorHealth)
+manaOrb = CreateOrb(nil,"D32_ManaOrb",defaultOrbSize,defaultTextures.manaOrb.fill,defaultTextures.manaOrb.rotation,340,defaultOrbY,"BOTTOM",monitorPower)
+-- Pet orb sits on the top-right of the player health orb
+petOrb = CreatePetOrb(healthOrb,"D32_PetOrb",defaultPetOrbSize,0,0,nil,nil)
+petOrb:ClearAllPoints()
+petOrb:SetPoint("CENTER", healthOrb, "TOPLEFT", -3, 23)
 -- Set initial pet orb power color based on pet's power type
 if petOrb then
 	UpdatePetOrbPowerColor(petOrb)
@@ -1462,8 +1706,9 @@ end
 powerFrame = nil
 if D32className == "Paladin" or D32className == "Warlock" or D32className == "Rogue" or D32className == "Druid" or D32className == "Monk" or D32className == "Priest" then powerFrame =  createPowerFrame(images.."d32_powerFrame.tga",manaOrb,"PowerFrame",95,50,50,50) end
 if powerFrame then makeFrameMovable(powerFrame) end
-angelFrame = addArtwork(images.."d3_angel3test.tga",manaOrb,"AngelFrame",-64,5,160,160)
-demonFrame = addArtwork(images.."d3_demon3test.tga",healthOrb,"DemonFrame",44,5,160,160)
+-- Orbs sit on screen edge; raise angel/demon by the old orb lift (15) so they stay put
+angelFrame = addArtwork(images.."d3_angel3test.tga",manaOrb,"AngelFrame",-64,20,160,160)
+demonFrame = addArtwork(images.."d3_demon3test.tga",healthOrb,"DemonFrame",44,20,160,160)
 -- Hide angel and demon by default
 angelFrame:Hide()
 demonFrame:Hide()
@@ -1471,9 +1716,65 @@ makeFrameMovable(healthOrb)
 makeFrameMovable(manaOrb)
 makeFrameMovable(petOrb)
 
+local function ApplyAutomaticPowerOrbColor()
+	if matchingPresetIndex() ~= nil then
+		powerUsesLiveColor = false
+		return
+	end
+	powerUsesLiveColor = true
+	if not D32CharacterData or not D32CharacterData.manaOrb or not D32CharacterData.manaOrb.orbColor then
+		return
+	end
+	if not D32CharacterData.manaOrb.galaxy then
+		D32CharacterData.manaOrb.galaxy = {r = 0, g = 0, b = 0, a = 1}
+	end
+	Mr, Mg, Mb, Ma = PlayerPowerOrbColor()
+	D32CharacterData.manaOrb.orbColor.r = Mr
+	D32CharacterData.manaOrb.orbColor.g = Mg
+	D32CharacterData.manaOrb.orbColor.b = Mb
+	D32CharacterData.manaOrb.orbColor.a = Ma
+	D32CharacterData.manaOrb.galaxy.r = Mr
+	D32CharacterData.manaOrb.galaxy.g = Mg
+	D32CharacterData.manaOrb.galaxy.b = Mb
+	D32CharacterData.manaOrb.galaxy.a = Ma
+	if manaOrb and manaOrb.filling and D32UpdateOrbColor then
+		D32UpdateOrbColor(manaOrb, D32CharacterData.manaOrb.orbColor, D32CharacterData.manaOrb.galaxy, D32CharacterData.manaOrb.font1, D32CharacterData.manaOrb.font2)
+	end
+end
+
+local powerColorRetry = CreateFrame("Frame")
+powerColorRetry:Hide()
+powerColorRetry.untilAt = 0
+powerColorRetry.acc = 0
+powerColorRetry:SetScript("OnUpdate", function(self, elapsed)
+	if GetTime() > self.untilAt then
+		self:Hide()
+		return
+	end
+	self.acc = self.acc + elapsed
+	if self.acc < 0.25 then
+		return
+	end
+	self.acc = 0
+	ApplyAutomaticPowerOrbColor()
+end)
+
+local function BeginPowerColorRetry()
+	if matchingPresetIndex() ~= nil then
+		return
+	end
+	powerColorRetry.untilAt = GetTime() + 8
+	powerColorRetry.acc = 0
+	powerColorRetry:Show()
+	ApplyAutomaticPowerOrbColor()
+end
+
 local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:RegisterEvent("VARIABLES_LOADED")
+eventFrame:RegisterEvent("PLAYER_LOGIN")
+eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+eventFrame:RegisterEvent("UNIT_DISPLAYPOWER")
 eventFrame:RegisterEvent("UNIT_ENTERED_VEHICLE")
 eventFrame:RegisterEvent("UNIT_EXITED_VEHICLE")
 eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
@@ -1520,6 +1821,7 @@ function eventFrame:OnEvent(event,arg1)
 				end
 		end
 		D32GUI:Hide()
+		BeginPowerColorRetry()
 		end
 		
 		-- Initialize pet orb if pet already exists on login
@@ -1533,6 +1835,13 @@ function eventFrame:OnEvent(event,arg1)
 			if not petOrb:GetScript("OnUpdate") then
 				petOrb:SetScript("OnUpdate", updatePetValues)
 			end
+		end
+		RefreshBlizzardPetFrame()
+	elseif event == "PLAYER_LOGIN" or event == "PLAYER_ENTERING_WORLD" then
+		BeginPowerColorRetry()
+	elseif event == "UNIT_DISPLAYPOWER" then
+		if arg1 == "player" then
+			ApplyAutomaticPowerOrbColor()
 		end
 	elseif event == "VARIABLES_LOADED" then
 		D32MiniMapButtonPosition_LoadFromDefaults()
@@ -1580,6 +1889,7 @@ function eventFrame:OnEvent(event,arg1)
 				UpdatePetOrbPowerColor(petOrb)
 			end
 		end
+		RefreshBlizzardPetFrame()
 	end
 end
 
@@ -1607,3 +1917,18 @@ end
 --setup the slash command stuff, hide the GUI
 SlashCmdList["MDO"] = CommandFunc;
 SLASH_MDO1 = "/mdo";
+
+-- Refresh orb text when Interface > Status Text CVars change
+if DrakeishUI_RegisterStatusTextListener then
+	DrakeishUI_RegisterStatusTextListener(function()
+		if healthOrb and D32CharacterData then
+			setOrbFontPlacement(healthOrb, D32CharacterData.healthOrb)
+		end
+		if manaOrb and D32CharacterData then
+			setOrbFontPlacement(manaOrb, D32CharacterData.manaOrb)
+		end
+		if petOrb then
+			checkPetFontPlacement()
+		end
+	end)
+end

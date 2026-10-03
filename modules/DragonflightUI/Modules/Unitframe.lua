@@ -1527,6 +1527,14 @@ function Module.ChangePlayerframe()
     --PlayerFrameHealthBarTextLeft:SetPoint('LEFT', PlayerFrameHealthBar, 'LEFT', dx, 0)
     --PlayerFrameHealthBarTextRight:SetPoint('RIGHT', PlayerFrameHealthBar, 'RIGHT', -dx, 0)
 
+    -- Numbers only (match party/target); strip Blizzard "Health" / "Mana" prefixes
+    PlayerFrameHealthBar.prefix = nil
+    PlayerFrameManaBar.prefix = nil
+    if TextStatusBar_UpdateTextString then
+        TextStatusBar_UpdateTextString(PlayerFrameHealthBar)
+        TextStatusBar_UpdateTextString(PlayerFrameManaBar)
+    end
+
     -- Mana 119,12
     PlayerFrameManaBar:ClearAllPoints()
     PlayerFrameManaBar:SetPoint('LEFT', PlayerPortrait, 'RIGHT', 1, -17 + 0.5)
@@ -1569,6 +1577,59 @@ function Module.ChangePlayerframe()
 
     PlayerStatusTexture:ClearAllPoints()
     PlayerStatusTexture:SetPoint('TOPLEFT', frame.PlayerFrameBorder, 'TOPLEFT', 1, 1)
+
+    -- Class resource rows (runes, totems, soul shards) share one slot under
+    -- the player frame, 4px below the stock rune anchor so they clear the art.
+    PlacePlayerClassBars()
+end
+
+local function AnchorPlayerClassBar(bar)
+    if not bar or bar._drakeishAnchoring then return end
+    bar._drakeishAnchoring = true
+    if not bar._drakeishParent then
+        bar._drakeishParent = bar:GetParent()
+        bar._drakeishStrata = bar:GetFrameStrata()
+    end
+    local orb = _G.healthOrb or _G.D32_HealthOrb
+    local orbsOn = (_G.diablo_orbs_state == 1) and orb
+    bar:ClearAllPoints()
+    if orbsOn then
+        -- PlayerFrame is hidden while the orbs are up, so the bar must leave it.
+        if bar:GetParent() ~= UIParent then
+            bar:SetParent(UIParent)
+        end
+        bar:SetFrameStrata('MEDIUM')
+        bar:SetPoint('BOTTOM', orb, 'TOP', 0, 5)
+    elseif PlayerFrame then
+        local parent = bar._drakeishParent or PlayerFrame
+        if parent and bar:GetParent() ~= parent then
+            bar:SetParent(parent)
+        end
+        if bar._drakeishStrata then
+            bar:SetFrameStrata(bar._drakeishStrata)
+        end
+        bar:SetPoint('TOP', PlayerFrame, 'BOTTOM', 52, 30)
+    end
+    bar._drakeishAnchoring = nil
+    if not bar._drakeishOffset then
+        bar._drakeishOffset = true
+        bar:HookScript('OnShow', function(self)
+            AnchorPlayerClassBar(self)
+        end)
+    end
+end
+
+local classBarsHooked = false
+function PlacePlayerClassBars()
+    AnchorPlayerClassBar(RuneFrame)
+    AnchorPlayerClassBar(TotemFrame)
+    AnchorPlayerClassBar(ShardBarFrame)
+    if not classBarsHooked and type(TotemFrame_Update) == 'function' then
+        classBarsHooked = true
+        hooksecurefunc('TotemFrame_Update', function()
+            AnchorPlayerClassBar(TotemFrame)
+        end)
+    end
 end
 --ChangePlayerframe()
 --frame:RegisterEvent('PLAYER_ENTERING_WORLD')
@@ -1914,26 +1975,42 @@ function Module.ChangeTargetFrame()
     -- Add border texture to target frame buffs
     local CUSTOM_BORDER_PATH = "Interface\\AddOns\\DrakeishUI\\assets\\uiactionbariconframe.tga"
     local BORDER_SCALE = 1.1
+    -- Blizzard uses LARGE (21) for player-applied auras and SMALL (17) for others.
+    -- That looks uneven on pets/party; force one size for every target aura.
+    local UNIFORM_AURA_SIZE = 17
     
     local function StyleTargetAuraIcon(button)
-        if not button or button.styled then return end
+        if not button then return end
         local width = button:GetWidth() * BORDER_SCALE
         local height = button:GetHeight() * BORDER_SCALE
-        local border = button:CreateTexture(nil, "OVERLAY")
-        border:SetTexture(CUSTOM_BORDER_PATH)
-        border:SetSize(width, height)
-        border:SetPoint("CENTER", button, "CENTER", 0, 0)
-        button.border = border
-        button.styled = true
+        if not button.styled then
+            local border = button:CreateTexture(nil, "OVERLAY")
+            border:SetTexture(CUSTOM_BORDER_PATH)
+            border:SetPoint("CENTER", button, "CENTER", 0, 0)
+            button.border = border
+            button.styled = true
+        end
+        if button.border then
+            button.border:SetSize(width, height)
+        end
+    end
+    
+    local function NormalizeTargetAuraSize(button)
+        if not button then return end
+        button:SetSize(UNIFORM_AURA_SIZE, UNIFORM_AURA_SIZE)
+        StyleTargetAuraIcon(button)
     end
     
     -- Hook target frame buff updates to style buttons with border
     -- Limit visibility to maximum 3 rows (18 buttons: 6 per row)
     hooksecurefunc("TargetFrame_UpdateAuras", function()
         -- Reapply castbar position when buffs update (prevents Blizzard from repositioning it)
-        if TargetFrameSpellBar and TargetFrameSpellBar:IsShown() then
-            TargetFrameSpellBar:ClearAllPoints()
-            TargetFrameSpellBar:SetPoint('TOPLEFT', TargetFrame, 'BOTTOMLEFT', 25 - 20, 22)
+        -- Skip while Diablo orbs own the castbar
+        if not (_G.diablo_orbs_state == 1 and _G.DrakeishUI_DiabloTargetFrame and _G.DrakeishUI_DiabloTargetFrame:IsShown()) then
+            if TargetFrameSpellBar and TargetFrameSpellBar:IsShown() then
+                TargetFrameSpellBar:ClearAllPoints()
+                TargetFrameSpellBar:SetPoint('TOPLEFT', TargetFrame, 'BOTTOMLEFT', 25 - 20, 22)
+            end
         end
         
         -- Reapply class colors when buffs update (prevents them from being overwritten)
@@ -1943,19 +2020,11 @@ function Module.ChangeTargetFrame()
         
         local MAX_VISIBLE_AURAS = 18 -- 3 rows * 6 buttons per row
         
-        -- Get the size from the first buff button to match debuff size
-        local firstBuff = _G["TargetFrameBuff1"]
-        local buffWidth, buffHeight
-        if firstBuff then
-            buffWidth = firstBuff:GetWidth()
-            buffHeight = firstBuff:GetHeight()
-        end
-        
         -- Handle target buffs
         for i = 1, 32 do
             local buff = _G["TargetFrameBuff"..i]
             if buff then
-                StyleTargetAuraIcon(buff)
+                NormalizeTargetAuraSize(buff)
                 -- Move first buff button 25px down (others will follow since they're anchored to it)
                 if i == 1 and buff:IsShown() then
                     local point, relativeTo, relativePoint, xOfs, yOfs = buff:GetPoint(1)
@@ -1981,11 +2050,7 @@ function Module.ChangeTargetFrame()
         for i = 1, 32 do
             local debuff = _G["TargetFrameDebuff"..i]
             if debuff then
-                -- Set debuff size to match buff size
-                if buffWidth and buffHeight then
-                    debuff:SetSize(buffWidth, buffHeight)
-                end
-                StyleTargetAuraIcon(debuff)
+                NormalizeTargetAuraSize(debuff)
                 
                 -- Position first debuff directly under TargetFrameBuff13
                 if i == 1 and debuffAnchor then

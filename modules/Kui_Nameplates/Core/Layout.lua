@@ -154,6 +154,12 @@ local function GetDesiredAlpha(frame)
 		return 1
 	end
 
+	-- 1 = selected unit only. 2 = that same layout on every unit.
+	local mode = _G.DrakeishUI_NameplateMode or 1
+	if mode == 2 then
+		return 1
+	end
+
 	if UnitExists("target") then
 		return frame.defaultAlpha == 1 and 1 or profile_fade.fadedalpha
 	else
@@ -228,7 +234,272 @@ local function OnFrameLeave(self)
 		self.health.p:Hide()
 	end
 end
+local function CapturePoints(region)
+	local points = {}
+	if not region or not region.GetNumPoints then
+		return points
+	end
+	local count = region:GetNumPoints()
+	for i = 1, count do
+		points[i] = { region:GetPoint(i) }
+	end
+	return points
+end
+
+local function ApplyPoints(region, points)
+	if not region or not points or not points[1] then
+		return
+	end
+	region:ClearAllPoints()
+	for i = 1, #points do
+		local point, relativeTo, relativePoint, x, y = unpack(points[i])
+		if relativeTo then
+			region:SetPoint(point, relativeTo, relativePoint, x, y)
+		else
+			region:SetPoint(point, x, y)
+		end
+	end
+end
+
+local function ApplyBox(region, info)
+	if not region or not info then
+		return
+	end
+	ApplyPoints(region, info.points)
+	if not info.points or #info.points < 2 then
+		if info.width and info.width > 0 then
+			region:SetWidth(info.width)
+		end
+		if info.height and info.height > 0 then
+			region:SetHeight(info.height)
+		end
+	end
+end
+
+local function CaptureTexture(region)
+	if not region then
+		return nil
+	end
+	local info = {
+		width = region:GetWidth(),
+		height = region:GetHeight(),
+		points = CapturePoints(region)
+	}
+	if region.GetTexture then
+		info.texture = region:GetTexture()
+	end
+	if region.GetTexCoord then
+		info.texcoord = { region:GetTexCoord() }
+	end
+	return info
+end
+
+local function RestoreTexture(region, info, shown)
+	if not region or not info then
+		return
+	end
+	if info.texture and region.SetTexture then
+		region:SetTexture(info.texture)
+	end
+	if info.texcoord and info.texcoord[1] and region.SetTexCoord then
+		region:SetTexCoord(unpack(info.texcoord))
+	end
+	ApplyBox(region, info)
+	if shown then
+		region:Show()
+	end
+end
+
+local function CaptureStatusBar(bar)
+	local info = CaptureTexture(bar)
+	local tex = bar and bar:GetStatusBarTexture()
+	if tex then
+		info.barTexture = tex:GetTexture()
+		info.barTexcoord = { tex:GetTexCoord() }
+		info.barWidth = tex:GetWidth()
+		info.barHeight = tex:GetHeight()
+		info.barPoints = CapturePoints(tex)
+	end
+	return info
+end
+
+local function RestoreStatusBar(bar, info)
+	if not bar or not info then
+		return
+	end
+	if info.barTexture then
+		bar:SetStatusBarTexture(info.barTexture)
+	end
+	ApplyBox(bar, info)
+	local tex = bar:GetStatusBarTexture()
+	if not tex then
+		return
+	end
+	if info.barTexcoord and info.barTexcoord[1] then
+		tex:SetTexCoord(unpack(info.barTexcoord))
+	end
+	ApplyBox(tex, {
+		points = info.barPoints,
+		width = info.barWidth,
+		height = info.barHeight
+	})
+end
+
+function addon:CaptureNativeNameplate(frame, healthBar, castBar, glowRegion, overlayRegion, castbarOverlay, shieldedRegion, spellIconRegion, highlightRegion, nameTextRegion, levelTextRegion, bossIconRegion)
+	local f = frame.kui
+	local levelFont, levelSize, levelFlags = levelTextRegion:GetFont()
+	f.nativeLayout = {
+		health = CaptureStatusBar(healthBar),
+		cast = CaptureStatusBar(castBar),
+		glow = CaptureTexture(glowRegion),
+		overlay = CaptureTexture(overlayRegion),
+		castOverlay = CaptureTexture(castbarOverlay),
+		shield = CaptureTexture(shieldedRegion),
+		spell = CaptureTexture(spellIconRegion),
+		highlight = CaptureTexture(highlightRegion),
+		boss = CaptureTexture(bossIconRegion),
+		name = CaptureTexture(nameTextRegion),
+		level = {
+			parent = levelTextRegion:GetParent(),
+			font = levelFont,
+			size = levelSize,
+			flags = levelFlags,
+			justifyH = levelTextRegion:GetJustifyH(),
+			justifyV = levelTextRegion:GetJustifyV(),
+			width = levelTextRegion:GetWidth(),
+			height = levelTextRegion:GetHeight(),
+			points = CapturePoints(levelTextRegion),
+			shadow = { levelTextRegion:GetShadowColor() }
+		}
+	}
+	f.nativeLayout.level.shadowX, f.nativeLayout.level.shadowY = levelTextRegion:GetShadowOffset()
+end
+
+function addon:FitNativeNameplate(frame)
+	local f = frame.kui
+	if not f or not f.nativeCastOverlay then
+		return
+	end
+	if f.oldCastbar:IsShown() then
+		f.nativeCastOverlay:Show()
+	else
+		f.nativeCastOverlay:Hide()
+	end
+end
+
+function addon:UseNativeNameplate(frame)
+	local f = frame.kui
+	if not f or not f.nativeLayout then
+		return
+	end
+	local saved = f.nativeLayout
+	f:Hide()
+	f.nativeShown = true
+	f.elapsed = 0
+	f.critElap = 0
+
+	RestoreTexture(f.nativeOverlay, saved.overlay, true)
+	RestoreTexture(f.nativeCastOverlay, saved.castOverlay, false)
+	RestoreTexture(f.glow, saved.glow, false)
+	RestoreTexture(f.oldHighlight, saved.highlight, false)
+	RestoreTexture(f.boss, saved.boss, false)
+	RestoreTexture(f.shield, saved.shield, false)
+	RestoreTexture(f.spell, saved.spell, false)
+
+	RestoreStatusBar(f.oldHealth, saved.health)
+	f.oldHealth:Show()
+	RestoreStatusBar(f.oldCastbar, saved.cast)
+	RestoreTexture(f.oldName, saved.name, true)
+
+	if f.level and saved.level then
+		local level = saved.level
+		f.level:SetParent(level.parent or frame)
+		if level.font and level.size then
+			f.level:SetFont(level.font, level.size, level.flags)
+		end
+		if level.justifyH then
+			f.level:SetJustifyH(level.justifyH)
+		end
+		if level.justifyV then
+			f.level:SetJustifyV(level.justifyV)
+		end
+		if level.shadow then
+			f.level:SetShadowColor(unpack(level.shadow))
+		end
+		if level.shadowX then
+			f.level:SetShadowOffset(level.shadowX, level.shadowY or 0)
+		end
+		ApplyBox(f.level, level)
+		f.level:Show()
+	end
+end
+
+function addon:UseKuiNameplate(frame)
+	local f = frame.kui
+	if not f or not f.nativeShown then
+		return
+	end
+	f.nativeShown = nil
+
+	f.oldHealth:Hide()
+	f.oldHealth:SetStatusBarTexture(kui.m.t.empty)
+	f.oldCastbar:SetStatusBarTexture(kui.m.t.empty)
+	f.oldName:Hide()
+	f.spell:SetSize(0.01, 0.01)
+	if f.nativeOverlay then
+		f.nativeOverlay:SetTexture(nil)
+		f.nativeOverlay:Hide()
+	end
+	if f.nativeCastOverlay then
+		f.nativeCastOverlay:SetTexture(nil)
+		f.nativeCastOverlay:Hide()
+	end
+	f.glow:SetTexture(nil)
+	f.oldHighlight:SetTexture(nil)
+	f.boss:SetTexture(nil)
+	f.shield:SetTexture(nil)
+
+	if f.level then
+		f.level = f:CreateFontString(f.level, {
+			reset = true,
+			font = addon.font,
+			size = "level",
+			alpha = 1,
+			outline = "OUTLINE"
+		})
+		f.level:SetParent(f.overlay)
+		f.level:SetShadowColor(0, 0, 0, 0.85)
+		f.level:SetShadowOffset(1, -1)
+	end
+	if frame:IsShown() then
+		f:Show()
+		addon:UpdateLevel(f, f.trivial)
+		addon:UpdateName(f, f.trivial)
+	end
+end
+
+function addon:ApplyDrakeishNameplateMode()
+	local mode = _G.DrakeishUI_NameplateMode or 1
+	for _, frame in pairs(self.frameList) do
+		if frame.kui then
+			if mode == 3 then
+				self:UseNativeNameplate(frame)
+			else
+				self:UseKuiNameplate(frame)
+				self:SendMessage("KuiNameplates_PostShow", frame.kui)
+			end
+		end
+	end
+end
+
 local function OnFrameShow(self)
+	if (_G.DrakeishUI_NameplateMode or 1) == 3 then
+		addon:UseNativeNameplate(self)
+		return
+	end
+	if self.kui and self.kui.nativeShown then
+		addon:UseKuiNameplate(self)
+	end
 	local f = self.kui
 	local trivial = f:IsTrivial()
 
@@ -341,6 +612,13 @@ end
 -- stuff that needs to be updated every frame
 local function OnFrameUpdate(self, e)
 	local f = self.kui
+	if (_G.DrakeishUI_NameplateMode or 1) == 3 then
+		if f:IsShown() or not f.nativeShown then
+			addon:UseNativeNameplate(self)
+		end
+		addon:FitNativeNameplate(self)
+		return
+	end
 	f.elapsed = f.elapsed - e
 	f.critElap = f.critElap - e
 
@@ -584,6 +862,67 @@ local function SetName(self)
 	end
 	
 	self.name:SetText(self.name.text)
+	addon:UpdateSelectedName(self)
+end
+
+local SELECTED_NAME_GLOW = {
+	{-1, 0}, {1, 0}, {0, -1}, {0, 1},
+	{-1, -1}, {1, -1}, {-1, 1}, {1, 1},
+	{-2, 0}, {2, 0}, {0, -2}, {0, 2}
+}
+
+function addon:UpdateSelectedName(f)
+	if not f or not f.name then
+		return
+	end
+	local glow = f.name.azureGlow
+	local selected = (_G.DrakeishUI_NameplateMode or 1) == 2 and f.target
+	if not selected then
+		if glow then
+			for i = 1, #glow do
+				glow[i]:Hide()
+			end
+		end
+		return
+	end
+
+	if not glow then
+		glow = {}
+		f.name.azureGlow = glow
+		local parent = f.name:GetParent() or f.overlay
+		for i = 1, #SELECTED_NAME_GLOW do
+			local copy = parent:CreateFontString(nil, "BORDER")
+			copy:SetWordWrap(false)
+			glow[i] = copy
+		end
+		f.name:SetDrawLayer("OVERLAY")
+	end
+
+	local font, size = f.name:GetFont()
+	local text = f.name:GetText() or ""
+	local justifyH = f.name:GetJustifyH()
+	local justifyV = f.name:GetJustifyV()
+	local width = f.name:GetWidth()
+	local height = f.name:GetHeight()
+	for i = 1, #SELECTED_NAME_GLOW do
+		local copy = glow[i]
+		local ox, oy = SELECTED_NAME_GLOW[i][1], SELECTED_NAME_GLOW[i][2]
+		local outer = (ox >= 2 or ox <= -2 or oy >= 2 or oy <= -2)
+		if font and size then
+			copy:SetFont(font, size, "")
+		end
+		copy:SetJustifyH(justifyH)
+		copy:SetJustifyV(justifyV)
+		copy:SetWordWrap(false)
+		copy:SetText(text)
+		copy:SetTextColor(0.15, 0.72, 1, outer and 0.35 or 0.9)
+		copy:SetWidth(width)
+		copy:SetHeight(height)
+		copy:ClearAllPoints()
+		copy:SetPoint("CENTER", f.name, "CENTER", ox, oy)
+		copy:Show()
+	end
+	f.name:SetTextColor(0.82, 0.96, 1)
 end
 local function IsTrivial(self)
 	return false
@@ -607,6 +946,10 @@ function addon:InitFrame(frame)
 	-- fetch default ui's objects
 	local healthBar, castBar = frame:GetChildren()
 	local glowRegion, overlayRegion, castbarOverlay, shieldedRegion, spellIconRegion, highlightRegion, nameTextRegion, levelTextRegion, bossIconRegion, raidIconRegion, stateIconRegion = frame:GetRegions()
+
+	f.nativeOverlay = overlayRegion
+	f.nativeCastOverlay = castbarOverlay
+	self:CaptureNativeNameplate(frame, healthBar, castBar, glowRegion, overlayRegion, castbarOverlay, shieldedRegion, spellIconRegion, highlightRegion, nameTextRegion, levelTextRegion, bossIconRegion)
 
 	overlayRegion:SetTexture(nil)
 	highlightRegion:SetTexture(nil)

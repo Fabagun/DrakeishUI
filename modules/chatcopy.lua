@@ -19,22 +19,46 @@ local chatCopyFrame = nil
 local function CreateChatCopyFrame()
     if chatCopyFrame then return end
     
-    -- Main frame
+    -- Main frame. Metal chrome, with the old see-through dialog fill (not the rock).
     chatCopyFrame = CreateFrame("Frame", "DrakeishUI_ChatCopyFrame", UIParent)
-    chatCopyFrame:SetBackdrop({
-        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-        tile = true, 
-        tileSize = 16, 
-        edgeSize = 16,
-        insets = {left = 3, right = 3, top = 5, bottom = 3}
-    })
-    chatCopyFrame:SetBackdropColor(0, 0, 0, 0.9)
     chatCopyFrame:SetWidth(600)
     chatCopyFrame:SetHeight(500)
     chatCopyFrame:SetPoint("CENTER", UIParent, "CENTER")
     chatCopyFrame:Hide()
     chatCopyFrame:SetFrameStrata("DIALOG")
+
+    local NE = DrakeishUI_SocialNE
+    local PC = NE and NE.panelchrome
+    if PC and PC.Apply then
+        PC.Apply(chatCopyFrame, {
+            layout = "ButtonFrameTemplateNoPortrait",
+            noPortrait = true,
+            noCloseButton = true,
+            title = "Chat History Copy",
+        })
+        if chatCopyFrame.Bg then
+            -- Same fill as the old dialog: dark, tiled, 90% opaque so the world still shows through.
+            -- 1px sat outside the left metal stroke; 6px meets it, same as the other windows.
+            chatCopyFrame.Bg:ClearAllPoints()
+            chatCopyFrame.Bg:SetPoint("TOPLEFT", chatCopyFrame, "TOPLEFT", 6, -4)
+            chatCopyFrame.Bg:SetPoint("BOTTOMRIGHT", chatCopyFrame, "BOTTOMRIGHT", -1, 2)
+            chatCopyFrame.Bg:SetTexture("Interface\\DialogFrame\\UI-DialogBox-Background", "REPEAT", "REPEAT")
+            chatCopyFrame.Bg:SetHorizTile(true)
+            chatCopyFrame.Bg:SetVertTile(true)
+            chatCopyFrame.Bg:SetVertexColor(0, 0, 0, 0.9)
+            chatCopyFrame.Bg:Show()
+        end
+    else
+        chatCopyFrame:SetBackdrop({
+            bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+            edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+            tile = true,
+            tileSize = 16,
+            edgeSize = 16,
+            insets = {left = 3, right = 3, top = 5, bottom = 3}
+        })
+        chatCopyFrame:SetBackdropColor(0, 0, 0, 0.9)
+    end
     
     -- Global Esc key handler
     chatCopyFrame:SetScript("OnKeyDown", function(self, key)
@@ -46,21 +70,14 @@ local function CreateChatCopyFrame()
     -- Don't enable keyboard initially - will be enabled when editbox is clicked
     chatCopyFrame:EnableKeyboard(false)
     
-    -- Title bar (non-movable)
-    local titleBar = CreateFrame("Frame", nil, chatCopyFrame)
-    titleBar:SetHeight(25)
-    titleBar:SetPoint("TOPLEFT", chatCopyFrame, "TOPLEFT", 0, 0)
-    titleBar:SetPoint("TOPRIGHT", chatCopyFrame, "TOPRIGHT", 0, 0)
-    
-    -- Title text
-    local titleText = titleBar:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    titleText:SetPoint("CENTER", titleBar, "CENTER", 0, 0)
-    titleText:SetText("Chat History Copy")
-    
-    -- Scroll area
+    -- Scroll area sits inside the metal frame. The bar is skinned onto the template slider.
     local scrollArea = CreateFrame("ScrollFrame", "DrakeishUI_ChatCopyScroll", chatCopyFrame, "UIPanelScrollFrameTemplate")
-    scrollArea:SetPoint("TOPLEFT", chatCopyFrame, "TOPLEFT", 8, -35)
-    scrollArea:SetPoint("BOTTOMRIGHT", chatCopyFrame, "BOTTOMRIGHT", -30, 45)
+    scrollArea:SetPoint("TOPLEFT", chatCopyFrame, "TOPLEFT", 16, -32)
+    scrollArea:SetPoint("BOTTOMRIGHT", chatCopyFrame, "BOTTOMRIGHT", -28, 46)
+    scrollArea.ScrollBar = _G["DrakeishUI_ChatCopyScrollScrollBar"]
+    if NE and NE.scrollbar and NE.scrollbar.Reskin then
+        NE.scrollbar.Reskin(scrollArea, { x = 8, strataHigh = false })
+    end
     
     -- Edit box
     local editBox = CreateFrame("EditBox", "DrakeishUI_ChatCopyBox", chatCopyFrame)
@@ -69,7 +86,7 @@ local function CreateChatCopyFrame()
     editBox:EnableMouse(true)
     editBox:SetAutoFocus(false)
     editBox:SetFontObject(ChatFontNormal)
-    editBox:SetWidth(550)
+    editBox:SetWidth(548)
     editBox:SetHeight(400)
     editBox:SetScript("OnEscapePressed", function(self) 
         chatCopyFrame:Hide() 
@@ -136,6 +153,9 @@ local function CreateChatCopyFrame()
     -- Close button
     local closeButton = CreateFrame("Button", "DrakeishUI_ChatCopyClose", chatCopyFrame, "UIPanelCloseButton")
     closeButton:SetPoint("TOPRIGHT", chatCopyFrame, "TOPRIGHT", 2, 2)
+    if PC and PC.ModernizeCloseButton then
+        PC.ModernizeCloseButton(closeButton, { frameLevelBump = 20 })
+    end
     closeButton:SetScript("OnClick", function() 
         chatCopyFrame:Hide() 
         editBox:SetText("") 
@@ -144,7 +164,7 @@ local function CreateChatCopyFrame()
     -- Copy button
     local copyButton = CreateFrame("Button", "DrakeishUI_ChatCopyButton", chatCopyFrame, "UIPanelButtonTemplate")
     copyButton:SetSize(100, 25)
-    copyButton:SetPoint("BOTTOMLEFT", chatCopyFrame, "BOTTOMLEFT", 10, 10)
+    copyButton:SetPoint("BOTTOMLEFT", chatCopyFrame, "BOTTOMLEFT", 16, 12)
     copyButton:SetText("Copy All")
     copyButton:SetScript("OnClick", function()
         editBox:HighlightText(0)
@@ -166,6 +186,15 @@ local function CreateChatCopyFrame()
     instructionText:SetPoint("LEFT", clearButton, "RIGHT", 15, 0)
     instructionText:SetText("Ctrl+C to copy selected text (read-only)")
     instructionText:SetTextColor(1, 1, 0) -- Yellow color
+
+    -- Drag the title with BlizzMove. The text area stays for selecting and copying.
+    local moveHandle = chatCopyFrame._neTitleBand or chatCopyFrame
+    if moveHandle ~= chatCopyFrame then
+        moveHandle:EnableMouse(true)
+    end
+    if BlizzMove and BlizzMove.Register then
+        BlizzMove:Register(chatCopyFrame, moveHandle)
+    end
 end
 
 -- Copy chat function

@@ -1,0 +1,18 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+	<Script file="Support.lua"/>
+	<Script file="Assets.lua"/>
+	<Script file="Slices.lua"/>
+	<Script file="Data.lua"/>
+	<Script file="DataTBC.lua"/>
+	<Script file="DataWotLK.lua"/>
+	<Script file="PortraitOverrides.lua"/>
+	<Script file="AbilitiesEra.lua"/>
+	<Script file="AbilitiesTBC.lua"/>
+	<Script file="AbilitiesWotLK.lua"/>
+	<Script file="LootEra.lua"/>
+	<Script file="ModelCam.lua"/>
+	<Script file="EncounterItem.lua"/>
+	<Script file="EncounterPage.lua"/>
+	<Script file="NavBar.lua"/>
+	<Script file="EncounterJournal.lua"/>
+</Ui>

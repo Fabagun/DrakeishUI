@@ -1,0 +1,10 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+	<Script file="Assets.lua"/>
+	<Script file="NodeData.lua"/>
+	<Script file="Talents.lua"/>
+	<Script file="SpecTabs.lua"/>
+	<Script file="Behavior.lua"/>
+	<Script file="Loadouts.lua"/>
+	<Script file="LoadoutsUI.lua"/>
+	<Script file="Glyphs.lua"/>
+</Ui>

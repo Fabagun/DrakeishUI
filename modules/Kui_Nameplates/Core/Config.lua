@@ -300,7 +300,7 @@ do
 	end
 
 	local options = {
-		name = category .. " - r|cfff58cba" .. addon.version .. "|r",
+		name = category .. " - r|cfff58cba" .. (addon.version or "?") .. "|r",
 		handler = addon:GetOptionHandler(addon),
 		type = "group",
 		get = "Get",

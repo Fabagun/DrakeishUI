@@ -2,10 +2,18 @@
 ..\FrameXML\UI.xsd">
 	<!-- utils -->
 	<Script file="atlas.lua"/>
+	<Script file="atlas_worldmap.lua"/>
+	<Script file="atlas_characterpanel.lua"/>
+	<Script file="class_portrait.lua"/>
 	<Script file="core.lua"/>
+	<Script file="modelview.lua"/>
 	<Script file="events.lua"/>
 	<Script file="formatting.lua"/>
 	<Script file="nineslice.lua"/>
+	<Script file="worldmap_runtime.lua"/>
+	<Script file="questpoi.lua"/>
+	<Script file="menu.lua"/>
+	<Script file="redbutton.lua"/>
 
 <!--
 *******************************************************************************

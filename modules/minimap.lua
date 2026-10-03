@@ -12,6 +12,18 @@ local _G = _G;
 ---------------------------------------------------
 
 MinimapCluster:SetScale(1.1)
+
+-- Instance difficulty skull. Child of MinimapCluster, stock TOPLEFT (22, -17), raised 9px.
+if MiniMapInstanceDifficulty then
+    local parent = MiniMapInstanceDifficulty:GetParent() or MinimapCluster
+    MiniMapInstanceDifficulty:ClearAllPoints()
+    MiniMapInstanceDifficulty:SetPoint("TOPLEFT", parent, "TOPLEFT", 22, -8)
+    MiniMapInstanceDifficulty:HookScript("OnShow", function(self)
+        local p = self:GetParent() or MinimapCluster
+        self:ClearAllPoints()
+        self:SetPoint("TOPLEFT", p, "TOPLEFT", 22, -8)
+    end)
+end
 MiniMapWorldMapButton:Hide()
 MinimapZoneTextButton:Hide() -- Hide default zone text above minimap
 MinimapZoneText:Hide()
@@ -45,11 +57,53 @@ MinimapBorder:Hide()
 MinimapNorthTag:Hide()
 MinimapNorthTag:SetAlpha(0)
 
--- Create a new custom border texture
-local customBorder = Minimap:CreateTexture(nil, "OVERLAY")
+-- Border sits on its own frame. A texture on Minimap gets clipped by the map mask,
+-- which is what shrank the ring. The double arrow is north on the art, so turning
+-- the border with the map keeps that arrow on north.
+-- The ring fills its texture. A square spun inside a square clips the corners and
+-- the ring looks smaller, so the host is sqrt(2) larger and the art is drawn at
+-- BORDER_SIZE inside it.
+local BORDER_SIZE = 160
+local BORDER_PAD = math.sqrt(2)
+local borderHost = CreateFrame("Frame", "DrakeishUI_MinimapBorder", MinimapCluster)
+borderHost:SetSize(BORDER_SIZE * BORDER_PAD, BORDER_SIZE * BORDER_PAD)
+borderHost:SetPoint("CENTER", Minimap, "CENTER", 0, 1)
+borderHost:SetFrameLevel(Minimap:GetFrameLevel() or 1)
+local customBorder = borderHost:CreateTexture(nil, "OVERLAY")
 customBorder:SetTexture("Interface\\AddOns\\DrakeishUI\\assets\\uiminimapborder.blp")
-customBorder:SetPoint("CENTER", Minimap, "CENTER", 0, 1)
-customBorder:SetSize(160, 160)
+customBorder:SetAllPoints(borderHost)
+
+local cos, sin = math.cos, math.sin
+local function SetBorderRotation(angle)
+	local c, s = cos(angle), sin(angle)
+	local function r(px, py)
+		local rx = (c * px + s * py) * BORDER_PAD
+		local ry = (-s * px + c * py) * BORDER_PAD
+		return 0.5 + rx, 0.5 - ry
+	end
+	local ulx, uly = r(-0.5, 0.5)
+	local llx, lly = r(-0.5, -0.5)
+	local urx, ury = r(0.5, 0.5)
+	local lrx, lry = r(0.5, -0.5)
+	customBorder:SetTexCoord(ulx, uly, llx, lly, urx, ury, lrx, lry)
+end
+
+local lastFacing
+borderHost:SetScript("OnUpdate", function()
+	local facing = 0
+	if GetCVar("rotateMinimap") == "1" then
+		facing = -(GetPlayerFacing() or 0)
+	end
+	if facing == lastFacing then
+		return
+	end
+	lastFacing = facing
+	SetBorderRotation(facing)
+	if _G.DrakeishUI_UpdateMinimapButtonsToggle then
+		_G.DrakeishUI_UpdateMinimapButtonsToggle(facing)
+	end
+end)
+SetBorderRotation(0)
 
 -- Move minimap to desired position
 Minimap:ClearAllPoints()
@@ -148,6 +202,7 @@ local zoneColors = {
 -- Update data every second
 local updater = CreateFrame("Frame", nil, infoFrame)
 local elapsed = 0
+local lastCoordX, lastCoordY -- keep last good reading while World Map is open
 updater:SetScript("OnUpdate", function(self, delta)
     elapsed = elapsed + delta
     if elapsed >= 1 then
@@ -162,11 +217,21 @@ updater:SetScript("OnUpdate", function(self, delta)
         local hour, minute = GetGameTime()
         timeValue:SetText(string.format("%02d:%02d", hour, minute))
 
-        -- Update coordinates
-        if not WorldMapFrame:IsShown() or not WorldMapFrame:IsMinimized() then
-        SetMapToCurrentZone()
+        -- Coordinates need SetMapToCurrentZone; that would yank the open World Map
+        -- off the quest/zone the player is viewing, so skip while map is shown and
+        -- keep the last valid coords instead.
+        local x, y
+        if not WorldMapFrame:IsShown() then
+            SetMapToCurrentZone()
+            x, y = GetPlayerMapPosition("player")
+            if x and y and (x > 0 or y > 0) then
+                lastCoordX, lastCoordY = x, y
+            else
+                lastCoordX, lastCoordY = nil, nil
+            end
+        else
+            x, y = lastCoordX, lastCoordY
         end
-        local x, y = GetPlayerMapPosition("player")
         if x and y and (x > 0 or y > 0) then
             coordValue:SetText(string.format("%.1f, %.1f", x * 100, y * 100))
         else

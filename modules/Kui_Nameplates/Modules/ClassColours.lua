@@ -16,13 +16,20 @@ local cc_table
 
 mod.uiName = L["Class colours"]
 
+local function SelectedAzure(frame)
+	return (_G.DrakeishUI_NameplateMode or 1) == 2 and frame.target
+end
+
 local function SetCVars()
 	SetCVar("ShowClassColorInNameplate", mod.db.profile.enemy and 1 or 0)
 end
 -- functions ###################################################################
 function mod:SetClassColour(frame, cc)
 	frame.name.class_coloured = true
-	frame.name:SetTextColor(cc.r, cc.g, cc.b)
+	if not SelectedAzure(frame) then
+		frame.name:SetTextColor(cc.r, cc.g, cc.b)
+	end
+	addon:UpdateSelectedName(frame)
 end
 -- message handlers ############################################################
 function mod:GUIDAssumed(msg, f)
@@ -59,6 +66,14 @@ function mod:PostShow(msg, f)
 	else
 		-- Hostile players
 		f.name:SetTextColor(1.0, 0.0, 0.0, 1) -- Red for hostile players
+	end
+	addon:UpdateSelectedName(f)
+end
+function mod:PostTarget(msg, f)
+	if f.target and (_G.DrakeishUI_NameplateMode or 1) == 2 then
+		addon:UpdateSelectedName(f)
+	else
+		self:PostShow(nil, f)
 	end
 end
 function mod:PostHide(msg, f)
@@ -124,10 +139,12 @@ function mod:OnEnable()
 	self:RegisterMessage("KuiNameplates_GUIDStored", "GUIDAssumed")
 	self:RegisterMessage("KuiNameplates_PostShow", "PostShow")
 	self:RegisterMessage("KuiNameplates_PostHide", "PostHide")
+	self:RegisterMessage("KuiNameplates_PostTarget", "PostTarget")
 end
 function mod:OnDisable()
 	self:UnregisterMessage("KuiNameplates_GUIDAssumed")
 	self:UnregisterMessage("KuiNameplates_GUIDStored")
 	self:UnregisterMessage("KuiNameplates_PostShow")
 	self:UnregisterMessage("KuiNameplates_PostHide")
+	self:UnregisterMessage("KuiNameplates_PostTarget")
 end

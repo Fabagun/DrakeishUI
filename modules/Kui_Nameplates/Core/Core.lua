@@ -5,8 +5,13 @@
 -- Backported by: Kader at https://github.com/bkader
 ]]
 local addon = LibStub("AceAddon-3.0"):NewAddon("KuiNameplates", "AceEvent-3.0", "AceTimer-3.0")
+-- Embedded under DrakeishUI, so Kui_Nameplates is not a registered AddOn name.
 addon.version = GetAddOnMetadata("Kui_Nameplates", "Version")
+	or GetAddOnMetadata("DrakeishUI", "Version")
+	or "262"
 addon.website = GetAddOnMetadata("Kui_Nameplates", "X-Website")
+	or GetAddOnMetadata("DrakeishUI", "X-Website")
+	or "https://github.com/bkader/KuiNameplates-WoTLK"
 _G.KuiNameplates = addon
 
 local kui = LibStub("Kui-1.0")

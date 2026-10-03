@@ -196,6 +196,10 @@ function addon:CreateLevel(frame, f)
 	f.level:SetJustifyV("MIDDLE")
 	f.level:SetHeight(10)
 	f.level:ClearAllPoints()
+	-- The stock nameplate level string keeps a large shadow offset. Pull it
+	-- in so the shadow sits under the digits instead of beside them.
+	f.level:SetShadowColor(0, 0, 0, 0.85)
+	f.level:SetShadowOffset(1, -1)
 	f.level.osize = "level" -- original font size used to update/restore
 
 	if self.db.profile.text.level then

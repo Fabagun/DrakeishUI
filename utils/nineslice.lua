@@ -166,20 +166,42 @@ local layouts =
 		RightEdge = {atlas = "!%s-nineslice-edgeright"},
 		Center = {atlas = "%s-nineslice-center"}
 	},
-	
-	-- ThreeSliceVerticalLayout = {
-		-- threeSliceVertical = true,
-		-- TopEdge = {atlas = "%s-threeslice-edgetop"},
-		-- BottomEdge = {atlas = "%s-threeslice-edgebottom"},
-		-- Center = {atlas = "!%s-threeslice-center"},
-	-- },
 
-	-- ThreeSliceHorizontalLayout = {
-		-- threeSliceHorizontal = true,
-		-- LeftEdge = {atlas = "%s-threeslice-edgeleft"},
-		-- RightEdge = {atlas = "%s-threeslice-edgeright"},
-		-- Center = {atlas = "_%s-threeslice-center"},
-	-- },
+	-- Retail's PortraitFrameTemplate (world map / character panel chrome).
+	PortraitFrameTemplate = {
+		TopLeftCorner = {layer = "OVERLAY", atlas = "UI-Frame-PortraitMetal-CornerTopLeft", x = -13, y = 16},
+		TopRightCorner = {layer = "OVERLAY", atlas = "UI-Frame-Metal-CornerTopRight", x = 4, y = 16},
+		BottomLeftCorner = {layer = "OVERLAY", atlas = "UI-Frame-Metal-CornerBottomLeft", x = -13, y = -3},
+		BottomRightCorner = {layer = "OVERLAY", atlas = "UI-Frame-Metal-CornerBottomRight", x = 4, y = -3},
+		TopEdge = {layer = "OVERLAY", atlas = "_UI-Frame-Metal-EdgeTop", x = -4, y = 0, x1 = 4, y1 = 0},
+		BottomEdge = {layer = "OVERLAY", atlas = "_UI-Frame-Metal-EdgeBottom", x = 0, y = 0, x1 = 0, y1 = 0},
+		LeftEdge = {layer = "OVERLAY", atlas = "!UI-Frame-Metal-EdgeLeft", x = 0, y = 0, x1 = 0, y1 = 0},
+		RightEdge = {layer = "OVERLAY", atlas = "!UI-Frame-Metal-EdgeRight", x = 0, y = 0, x1 = 0, y1 = 0}
+	},
+
+	-- PortraitFrameTemplate with wide top-right corner for maximize + close.
+	PortraitFrameTemplateMinimizable = {
+		TopLeftCorner = {layer = "OVERLAY", atlas = "UI-Frame-PortraitMetal-CornerTopLeft", x = -13, y = 16},
+		TopRightCorner = {layer = "OVERLAY", atlas = "UI-Frame-Metal-CornerTopRightDouble", x = 4, y = 16},
+		BottomLeftCorner = {layer = "OVERLAY", atlas = "UI-Frame-Metal-CornerBottomLeft", x = -13, y = -3},
+		BottomRightCorner = {layer = "OVERLAY", atlas = "UI-Frame-Metal-CornerBottomRight", x = 4, y = -3},
+		TopEdge = {layer = "OVERLAY", atlas = "_UI-Frame-Metal-EdgeTop", x = -4, y = 0, x1 = 4, y1 = 0},
+		BottomEdge = {layer = "OVERLAY", atlas = "_UI-Frame-Metal-EdgeBottom", x = 0, y = 0, x1 = 0, y1 = 0},
+		LeftEdge = {layer = "OVERLAY", atlas = "!UI-Frame-Metal-EdgeLeft", x = 0, y = 0, x1 = 0, y1 = 0},
+		RightEdge = {layer = "OVERLAY", atlas = "!UI-Frame-Metal-EdgeRight", x = 0, y = 0, x1 = 0, y1 = 0}
+	},
+
+	-- Diamond metal dialog chrome (reputation detail popup, etc.).
+	Dialog = {
+		TopLeftCorner = {atlas = "UI-Frame-DiamondMetal-CornerTopLeft", x = -8, y = 8},
+		TopRightCorner = {atlas = "UI-Frame-DiamondMetal-CornerTopRight", x = 8, y = 8},
+		BottomLeftCorner = {atlas = "UI-Frame-DiamondMetal-CornerBottomLeft", x = -8, y = -8},
+		BottomRightCorner = {atlas = "UI-Frame-DiamondMetal-CornerBottomRight", x = 8, y = -8},
+		TopEdge = {atlas = "_UI-Frame-DiamondMetal-EdgeTop"},
+		BottomEdge = {atlas = "_UI-Frame-DiamondMetal-EdgeBottom"},
+		LeftEdge = {atlas = "!UI-Frame-DiamondMetal-EdgeLeft"},
+		RightEdge = {atlas = "!UI-Frame-DiamondMetal-EdgeRight"}
+	},
 }
 
 --------------------------------------------------
@@ -195,6 +217,7 @@ function NineSliceUtils.ApplyIdenticalCornersLayout(self, textureKit)
 end
 
 function NineSliceUtils.ApplyLayout(container, userLayout, textureKit)
+	if not userLayout then return end
 	for pieceIndex, setup in ipairs(nineSliceSetup) do
 		local pieceName = setup.pieceName
 		local pieceLayout = userLayout[pieceName]

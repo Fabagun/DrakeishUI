@@ -1,4 +1,4 @@
-﻿<Ui xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="http://www.blizzard.com/wow/ui/">
+<Ui xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="http://www.blizzard.com/wow/ui/">
 	<Script file="MistrasDiabloOrbs.lua" />
 	<Frame name="D32GUI" parent="UIParent" toplevel="true" movable="true">
 		<Size>
@@ -329,6 +329,9 @@
 							UnregisterUnitWatch(petOrb)
 							petOrb:Hide()
 							D32CharacterData.petOrb.enabled = false
+						end
+						if RefreshBlizzardPetFrame then
+							RefreshBlizzardPetFrame()
 						end
 					</OnClick>
 				</Scripts>

@@ -131,31 +131,166 @@ powerText:SetShadowOffset(1, -1)
 powerText:Hide()
 diabloTargetFrame.powerText = powerText
 
--- Enable mouse interaction for tooltip
-diabloTargetFrame:EnableMouse(true)
+-- Target castbar: under Diablo health bar while orbs are active.
+-- Parent to UIParent (TargetFrame is hidden) so the bar stays visible.
+-- Never let Blizzard Target_Spellbar_AdjustPosition run against this parent
+-- (it reads auraRows and crashes).
+local TARGET_CASTBAR_Y_OFFSET = -15
+local originalTargetSpellbarAdjust = Target_Spellbar_AdjustPosition
 
--- Tooltip on mouseover (like normal target frame)
+local function AttachTargetCastbarToDiablo()
+    if not TargetFrameSpellBar or not diabloTargetFrame or not diabloTargetFrame.healthBar then return end
+    TargetFrameSpellBar:SetParent(UIParent)
+    TargetFrameSpellBar:ClearAllPoints()
+    TargetFrameSpellBar:SetPoint('TOP', diabloTargetFrame.healthBar, 'BOTTOM', 0, TARGET_CASTBAR_Y_OFFSET)
+    TargetFrameSpellBar:SetFrameStrata('HIGH')
+    TargetFrameSpellBar:SetFrameLevel(diabloTargetFrame:GetFrameLevel() + 10)
+    local hbWidth = diabloTargetFrame.healthBar:GetWidth()
+    if hbWidth and hbWidth > 0 then
+        TargetFrameSpellBar:SetWidth(hbWidth)
+        TargetFrameSpellBar:SetHeight(8)
+    end
+    -- Border follows bar via edge anchors (set up in Castbar.lua)
+    if TargetFrameSpellBar.drakeishBorder then
+        TargetFrameSpellBar.drakeishBorder:ClearAllPoints()
+        TargetFrameSpellBar.drakeishBorder:SetPoint('TOPLEFT', TargetFrameSpellBar, 'TOPLEFT', -2, 2)
+        TargetFrameSpellBar.drakeishBorder:SetPoint('BOTTOMRIGHT', TargetFrameSpellBar, 'BOTTOMRIGHT', 2, -2)
+        TargetFrameSpellBar.drakeishBorder:Show()
+    end
+    if TargetFrameSpellBar.casting or TargetFrameSpellBar.channeling then
+        TargetFrameSpellBar:Show()
+    end
+end
+
+local function RestoreTargetCastbar()
+    if not TargetFrameSpellBar or not TargetFrame then return end
+    TargetFrameSpellBar:SetParent(TargetFrame)
+    TargetFrameSpellBar:ClearAllPoints()
+    TargetFrameSpellBar:SetPoint('TOPLEFT', TargetFrame, 'BOTTOMLEFT', 5, 22)
+    TargetFrameSpellBar:SetSize(175, 8)
+    TargetFrameSpellBar:SetFrameStrata(TargetFrame:GetFrameStrata())
+    if TargetFrameSpellBar.drakeishBorder then
+        TargetFrameSpellBar.drakeishBorder:ClearAllPoints()
+        TargetFrameSpellBar.drakeishBorder:SetPoint('TOPLEFT', TargetFrameSpellBar, 'TOPLEFT', -2, 2)
+        TargetFrameSpellBar.drakeishBorder:SetPoint('BOTTOMRIGHT', TargetFrameSpellBar, 'BOTTOMRIGHT', 2, -2)
+    end
+end
+
+local spellbarAdjustOverridden = false
+
+local function InstallSpellbarAdjustOverride()
+    if type(Target_Spellbar_AdjustPosition) ~= 'function' then return end
+    if spellbarAdjustOverridden then return end
+    originalTargetSpellbarAdjust = Target_Spellbar_AdjustPosition
+    Target_Spellbar_AdjustPosition = function(self)
+        if customFrameActive and diabloTargetFrame and diabloTargetFrame.healthBar then
+            AttachTargetCastbarToDiablo()
+            return
+        end
+        local parent = self and self:GetParent()
+        if not parent or parent.auraRows == nil then
+            if TargetFrame then
+                self:SetParent(TargetFrame)
+                self:ClearAllPoints()
+                self:SetPoint('TOPLEFT', TargetFrame, 'BOTTOMLEFT', 5, 22)
+            end
+            return
+        end
+        if type(originalTargetSpellbarAdjust) == 'function' then
+            return originalTargetSpellbarAdjust(self)
+        end
+    end
+    spellbarAdjustOverridden = true
+end
+
+InstallSpellbarAdjustOverride()
+
+-- Castbar.lua SetScript(OnShow) stores a direct Blizzard AdjustPosition ref;
+-- wrap after login so that path never runs while Diablo owns the bar.
+local castbarFixFrame = CreateFrame('Frame')
+castbarFixFrame:RegisterEvent('PLAYER_LOGIN')
+castbarFixFrame:SetScript('OnEvent', function(self)
+    self:UnregisterEvent('PLAYER_LOGIN')
+    InstallSpellbarAdjustOverride()
+    if not TargetFrameSpellBar then return end
+    local prevOnShow = TargetFrameSpellBar:GetScript('OnShow')
+    TargetFrameSpellBar:SetScript('OnShow', function(bar)
+        if customFrameActive and diabloTargetFrame and diabloTargetFrame.healthBar then
+            AttachTargetCastbarToDiablo()
+            return
+        end
+        if prevOnShow then
+            if bar:GetParent() ~= TargetFrame and TargetFrame then
+                bar:SetParent(TargetFrame)
+            end
+            -- Only call Blizzard adjust when parent has auraRows
+            local parent = bar:GetParent()
+            if parent and parent.auraRows ~= nil then
+                prevOnShow(bar)
+            end
+        end
+    end)
+end)
+
+-- Enable mouse interaction for tooltip + status-text hover
+diabloTargetFrame:EnableMouse(true)
+diabloTargetFrame.statusTextHover = false
+
+local function ApplyDiabloTargetStatusTextVisibility()
+    if not diabloTargetFrame.healthText or not diabloTargetFrame.powerText then return end
+    local show = true
+    if DrakeishUI_StatusTextVisible then
+        show = DrakeishUI_StatusTextVisible("target", diabloTargetFrame.statusTextHover)
+    elseif DrakeishUI_StatusTextIsShown then
+        show = DrakeishUI_StatusTextIsShown("target") or diabloTargetFrame.statusTextHover
+    else
+        show = diabloTargetFrame.statusTextHover
+    end
+    if show then
+        diabloTargetFrame.healthText:Show()
+        diabloTargetFrame.powerText:Show()
+    else
+        diabloTargetFrame.healthText:Hide()
+        diabloTargetFrame.powerText:Hide()
+    end
+end
+
+local function SetDiabloTargetStatusTextHover(hovering)
+    diabloTargetFrame.statusTextHover = hovering and true or false
+    ApplyDiabloTargetStatusTextVisibility()
+end
+
+-- Tooltip + status text on mouseover (like Blizzard bars / Diablo orbs)
 diabloTargetFrame:SetScript("OnEnter", function(self)
+    SetDiabloTargetStatusTextHover(true)
     if UnitExists("target") then
-        -- Use the same tooltip method as the normal target frame
         GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
         GameTooltip:SetUnit("target")
-        
-        -- Ensure the tooltip name color matches the normal target frame
-        -- The first line is the name, and it should use UnitSelectionColor
         local nameLine = _G["GameTooltipTextLeft1"]
         if nameLine then
             local r, g, b = UnitSelectionColor("target")
             nameLine:SetTextColor(r, g, b, 1)
         end
-        
         GameTooltip:Show()
     end
 end)
 
 diabloTargetFrame:SetScript("OnLeave", function(self)
+    SetDiabloTargetStatusTextHover(false)
     GameTooltip:Hide()
 end)
+
+-- Bars may receive mouse; mirror hover so text still appears
+if healthBar then
+    healthBar:EnableMouse(true)
+    healthBar:HookScript("OnEnter", function() SetDiabloTargetStatusTextHover(true) end)
+    healthBar:HookScript("OnLeave", function() SetDiabloTargetStatusTextHover(false) end)
+end
+if powerBar then
+    powerBar:EnableMouse(true)
+    powerBar:HookScript("OnEnter", function() SetDiabloTargetStatusTextHover(true) end)
+    powerBar:HookScript("OnLeave", function() SetDiabloTargetStatusTextHover(false) end)
+end
 
 -- Function to update target frame
 local function UpdateDiabloTargetFrame()
@@ -240,9 +375,6 @@ local function UpdateDiabloTargetFrame()
         end
     end
     
-    -- Update health text
-    diabloTargetFrame.healthText:SetText(health .. " / " .. maxHealth)
-    
     -- Update power bar
     local power = UnitPower("target")
     local maxPower = UnitPowerMax("target")
@@ -253,10 +385,20 @@ local function UpdateDiabloTargetFrame()
     local powerType = UnitPowerType("target")
     local powerColor = PowerBarColor[powerType] or PowerBarColor["MANA"]
     diabloTargetFrame.powerBar:SetStatusBarColor(powerColor.r, powerColor.g, powerColor.b, 1)
-    
-    -- Update power text
-    local powerPercent = maxPower > 0 and math.floor((power / maxPower) * 100) or 0
-    diabloTargetFrame.powerText:SetText(powerPercent .. "%")
+
+    -- Update health / power text from Interface > Status Text
+    -- Always set values; visibility = CVar on, or mouseover (Blizzard TextStatusBar style)
+    local usePercent = DrakeishUI_StatusTextUsePercent and DrakeishUI_StatusTextUsePercent()
+    local fmt = DrakeishUI_FormatStatusText
+    if fmt then
+        diabloTargetFrame.healthText:SetText(fmt(health, maxHealth, usePercent))
+        diabloTargetFrame.powerText:SetText(fmt(power, maxPower, usePercent))
+    else
+        diabloTargetFrame.healthText:SetText(health .. " / " .. maxHealth)
+        local powerPercent = maxPower > 0 and math.floor((power / maxPower) * 100) or 0
+        diabloTargetFrame.powerText:SetText(powerPercent .. "%")
+    end
+    ApplyDiabloTargetStatusTextVisibility()
 end
 
 -- Event frame for updating target frame
@@ -352,13 +494,14 @@ function ShowDiabloTargetFrame()
             end
         end
         -- Also hide all children (like TargetFrameTextureFrame, health bar, mana bar, etc.)
+        -- Keep TargetFrameSpellBar — it is reparented under the Diablo health bar
         local children = {TargetFrame:GetChildren()}
         for _, child in ipairs(children) do
-            if child and type(child.Hide) == "function" then
+            if child and child ~= TargetFrameSpellBar and type(child.Hide) == "function" then
                 pcall(function() child:Hide() end)
             end
             -- Also hide regions of children
-            if child then
+            if child and child ~= TargetFrameSpellBar then
                 local childRegions = {child:GetRegions()}
                 for _, childRegion in ipairs(childRegions) do
                     if childRegion and childRegion.Hide then
@@ -368,6 +511,8 @@ function ShowDiabloTargetFrame()
             end
         end
     end
+
+    AttachTargetCastbarToDiablo()
     
     -- Start periodic check to keep TargetFrame hidden
     hideCheckFrame:SetScript("OnUpdate", function(self, delta)
@@ -383,9 +528,16 @@ function ShowDiabloTargetFrame()
                 end
                 local children = {TargetFrame:GetChildren()}
                 for _, child in ipairs(children) do
-                    if child and type(child.Hide) == "function" then
+                    if child and child ~= TargetFrameSpellBar and type(child.Hide) == "function" then
                         pcall(function() child:Hide() end)
                     end
+                end
+            end
+            -- Keep castbar anchored under Diablo health bar
+            if TargetFrameSpellBar and diabloTargetFrame.healthBar then
+                local _, rel = TargetFrameSpellBar:GetPoint(1)
+                if rel ~= diabloTargetFrame.healthBar then
+                    AttachTargetCastbarToDiablo()
                 end
             end
         end
@@ -412,14 +564,16 @@ function HideDiabloTargetFrame()
     
     -- Stop periodic check
     hideCheckFrame:SetScript("OnUpdate", nil)
+
+    RestoreTargetCastbar()
     
     if TargetFrame then
         -- Recursive function to show all children and their children
         local function ShowAllChildren(frame)
             if not frame then return end
             
-            -- Skip TargetFrameDropDown and TargetFrameSpellBar - we don't want to show them
-            if frame == TargetFrameDropDown or frame == TargetFrameSpellBar then
+            -- Skip TargetFrameDropDown — castbar is restored separately
+            if frame == TargetFrameDropDown then
                 return
             end
             
@@ -439,10 +593,10 @@ function HideDiabloTargetFrame()
                 end
             end
             
-            -- Recursively show all children (but skip TargetFrameDropDown and TargetFrameSpellBar)
+            -- Recursively show all children (but skip TargetFrameDropDown)
             local children = {frame:GetChildren()}
             for _, child in ipairs(children) do
-                if child and child ~= TargetFrameDropDown and child ~= TargetFrameSpellBar then
+                if child and child ~= TargetFrameDropDown then
                     ShowAllChildren(child)
                 end
             end
@@ -519,12 +673,9 @@ function HideDiabloTargetFrame()
                 TargetFrameBackground:Hide()
             end
             
-            -- Hide TargetFrameDropDown and TargetFrameSpellBar - they weren't shown when we hid the frame, so don't show them now
+            -- Hide TargetFrameDropDown; castbar is restored separately via RestoreTargetCastbar
             if TargetFrameDropDown then
                 TargetFrameDropDown:Hide()
-            end
-            if TargetFrameSpellBar then
-                TargetFrameSpellBar:Hide()
             end
         else
             -- No target exists, ensure TargetFrame is hidden
@@ -980,4 +1131,13 @@ initFrame:SetScript("OnEvent", function(self, event, arg1)
         end)
     end
 end)
+
+-- Refresh Diablo target status text when Interface > Status Text CVars change
+if DrakeishUI_RegisterStatusTextListener then
+    DrakeishUI_RegisterStatusTextListener(function()
+        if customFrameActive and UpdateDiabloTargetFrame then
+            UpdateDiabloTargetFrame()
+        end
+    end)
+end
 

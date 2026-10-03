@@ -9,16 +9,30 @@ local _G = _G;
 local right_actionbars = true
 local sidebarsManuallyHidden = false
 
-local function ConfigureMultiBars()
+-- Extra X push when Diablo orbs are active so sidebars clear the orbs
+local ORB_PUSH_OFFSET = 105
+local OFFSET_X_LEFT = -480
+local OFFSET_X_RIGHT = 480
+local OFFSET_Y = 6
+local SCALE = 0.8
+
+local function AreDiabloOrbsActive()
+	if _G.diablo_orbs_state == 1 then return true end
+	if _G.D32_HealthOrb and _G.D32_HealthOrb:IsShown() then return true end
+	return false
+end
+
+local function ConfigureMultiBars(orbsActive)
     -- Constants
     local BUTTON_SIZE = 36
     local BUTTON_SPACING = 6
     local ROWS = 3
     local COLUMNS = 4
-    local OFFSET_X_LEFT = -480
-    local OFFSET_X_RIGHT = 477
-    local OFFSET_Y = 6
-    local SCALE = 0.8
+
+    if orbsActive == nil then
+        orbsActive = AreDiabloOrbsActive()
+    end
+    local push = orbsActive and ORB_PUSH_OFFSET or 0
 
     local function MoveBar(barName, offsetX)
         local barFrame = _G[barName]
@@ -53,8 +67,12 @@ local function ConfigureMultiBars()
         end
     end
 
-    MoveBar("MultiBarLeft", OFFSET_X_LEFT)
-    MoveBar("MultiBarRight", OFFSET_X_RIGHT)
+    MoveBar("MultiBarLeft", OFFSET_X_LEFT - push)
+    MoveBar("MultiBarRight", OFFSET_X_RIGHT + push)
+end
+
+function addon.RefreshSidebarPositions(orbsActive)
+	ConfigureMultiBars(orbsActive)
 end
 
 ConfigureMultiBars()

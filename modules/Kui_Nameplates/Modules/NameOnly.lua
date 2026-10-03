@@ -155,6 +155,15 @@ local function UpdateNameOnly(f)
 		f = f.kuiParent.kui
 	end
 
+	-- Modes 1 and 2 use the selected-unit layout (health bar and those name colours).
+	-- Name-only is what made other units lose the bar and change colour.
+	local mode = _G.DrakeishUI_NameplateMode or 1
+	if mode == 1 or mode == 2 then
+		SwitchOff(f)
+		addon:UpdateSelectedName(f)
+		return
+	end
+
 	if (f.target or not f.friend) or (not mod.db.profile.display.ondamaged and f.health.curr < f.health.max) then
 		SwitchOff(f)
 	else

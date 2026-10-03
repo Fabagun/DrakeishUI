@@ -64,9 +64,22 @@ end
 -- Function to update party frame positions based on unitframe toggle state
 function UpdatePartyFramePositions()
     if customPartyFrames[1] then
-        if unitframes_state == 1 then
-            -- Move party frames up when unitframes are above action bars
-            customPartyFrames[1]:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 16, -14)
+        local orbsActive = (_G.diablo_orbs_state == 1)
+        local useTopPosition = (unitframes_state == 1) or orbsActive
+        local petOrbEnabled = _G.D32CharacterData and _G.D32CharacterData.petOrb and _G.D32CharacterData.petOrb.enabled
+        -- Reserve space above party for Blizzard PetFrame when Diablo orbs are on but pet orb is off.
+        -- Skip when raid frames own the rectangular pet (Blizzard PetFrame stays hidden).
+        local hidePetFrame = (_G.hide_pet_frame_state or 0) == 1
+        local raidOwnsPet = _G.DrakeishUI_ShouldShowRaidStylePet and _G.DrakeishUI_ShouldShowRaidStylePet()
+        local reservePetSpace = orbsActive and not petOrbEnabled and not hidePetFrame and UnitExists("pet") and not raidOwnsPet
+        local PET_SPACE = 60
+
+        if useTopPosition then
+            local y = -14
+            if reservePetSpace then
+                y = -14 - PET_SPACE
+            end
+            customPartyFrames[1]:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 16, y)
         else
             -- Normal position when unitframes are in original positions
             customPartyFrames[1]:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 16, -200)
@@ -75,18 +88,30 @@ function UpdatePartyFramePositions()
         -- Also update the party toggle button position
         UpdatePartyToggleButtonPosition()
     end
+    if _G.DrakeishUI_UpdateRaidFramePositions then
+        _G.DrakeishUI_UpdateRaidFramePositions()
+    end
 end
 
 -- Function to update party toggle button position
 function UpdatePartyToggleButtonPosition()
-    if customPartyFrames[1] and partyToggleButton then
-        partyToggleButton:ClearAllPoints()
+    if not partyToggleButton then return end
+    partyToggleButton:ClearAllPoints()
+    -- While raid frames are active, sit next to the first raid unit (same offset as party)
+    if _G.DrakeishUI_RaidModeActive and _G.DrakeishUI_RaidModeActive() and _G.DrakeishUI_RaidFrames then
+        local root = _G.DrakeishUI_RaidFrames
+        if root:IsShown() then
+            partyToggleButton:SetPoint("TOPLEFT", root, "TOPLEFT", -15, -10)
+            return
+        end
+    end
+    if customPartyFrames[1] then
         partyToggleButton:SetPoint("TOPLEFT", customPartyFrames[1], "TOPLEFT", -15, -10)
-        -- print("Party toggle button repositioned to follow party frame") -- Debug message
     else
-        -- print("Party toggle button not found or party frame not created") -- Debug message
+        partyToggleButton:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 2, -190)
     end
 end
+_G.UpdatePartyToggleButtonPosition = UpdatePartyToggleButtonPosition
 
 -- Function to update party frame scale
 function UpdatePartyFrameScale()
@@ -133,9 +158,99 @@ local function HideDefaultPartyFrames()
     end
 end
 
+-- UTF-8 helpers (WotLK has no string.utf8sub; strlenutf8 exists)
+local function PartyUtf8Len(s)
+    local _, n = string.gsub(s, "[^\128-\191]", "")
+    return n
+end
+
+local function PartyUtf8Sub(s, startChar, endChar)
+    if not s or s == "" then return "" end
+    startChar = startChar or 1
+    endChar = endChar or -1
+    local len = PartyUtf8Len(s)
+    if endChar < 0 then
+        endChar = len + endChar + 1
+    end
+    if startChar < 1 then startChar = 1 end
+    if endChar > len then endChar = len end
+    if startChar > endChar then return "" end
+
+    local i = 1
+    local bytes = #s
+    local charIndex = 0
+    local startByte, endByte
+    while i <= bytes do
+        local b = string.byte(s, i)
+        local charBytes = 1
+        if b >= 240 then
+            charBytes = 4
+        elseif b >= 224 then
+            charBytes = 3
+        elseif b >= 192 then
+            charBytes = 2
+        end
+        charIndex = charIndex + 1
+        if charIndex == startChar then
+            startByte = i
+        end
+        if charIndex == endChar then
+            endByte = i + charBytes - 1
+            break
+        end
+        i = i + charBytes
+    end
+    if not startByte then return "" end
+    return string.sub(s, startByte, endByte or bytes)
+end
+
+-- Truncate party name so it never overlaps the level text
+local function SetPartyNameTruncated(frame, name)
+    local fontString = frame.name
+    local levelString = frame.level
+    if not fontString then return end
+
+    name = name or "Unknown"
+    fontString:SetText(name)
+
+    -- Space from name left edge to level left edge (with padding)
+    local maxWidth = 52
+    if levelString and frame:GetWidth() then
+        local levelWidth = levelString:GetStringWidth() or 14
+        -- portrait(4+40) + gap(10) ... level anchored RIGHT -16
+        maxWidth = frame:GetWidth() - 16 - levelWidth - 4 - (4 + 40 + 10)
+        if maxWidth < 24 then maxWidth = 24 end
+    end
+
+    fontString:SetWidth(maxWidth)
+    fontString:SetWordWrap(false)
+    fontString:SetNonSpaceWrap(false)
+
+    if fontString:GetStringWidth() <= maxWidth then
+        return
+    end
+
+    local ellipsis = ".."
+    local len = PartyUtf8Len(name)
+    while len > 1 do
+        len = len - 1
+        local truncated = PartyUtf8Sub(name, 1, len) .. ellipsis
+        fontString:SetText(truncated)
+        if fontString:GetStringWidth() <= maxWidth then
+            return
+        end
+    end
+end
+
 local function UpdatePartyFrame(frame, unit)
     -- First check if competing addon is loaded - if so, hide frame
     if IsCompetingAddonLoaded() then
+        frame:Hide()
+        return
+    end
+
+    -- Compact raid mode takes over while in a raid with raid toggle on
+    if _G.DrakeishUI_RaidModeActive and _G.DrakeishUI_RaidModeActive() then
         frame:Hide()
         return
     end
@@ -154,28 +269,50 @@ local color = RAID_CLASS_COLORS[class] or { r = 1, g = 1, b = 1 }
 local vibrantR = math.min(1, color.r * 1.1)
 local vibrantG = math.min(1, color.g * 1.1)
 local vibrantB = math.min(1, color.b * 1.1)
-frame.name:SetText(name)
-frame.name:SetTextColor(vibrantR, vibrantG, vibrantB)
         local level = UnitLevel(unit) or "??"
 frame.level:SetText(level)
 frame.level:SetTextColor(vibrantR, vibrantG, vibrantB)
+        -- Truncate after level is set so width calculation can reserve space for it
+        SetPartyNameTruncated(frame, name)
+frame.name:SetTextColor(vibrantR, vibrantG, vibrantB)
 
         local health = UnitHealth(unit)
         local maxHealth = UnitHealthMax(unit)
         frame.healthBar:SetMinMaxValues(0, maxHealth)
         frame.healthBar:SetValue(health)
-        frame.healthText:SetText(health .. " / " .. maxHealth)
-        
-        -- Set health bar color to class color (10% more vibrant)
-        frame.healthBar:SetStatusBarColor(vibrantR, vibrantG, vibrantB)
 
         local power = UnitPower(unit)
         local maxPower = UnitPowerMax(unit)
         frame.powerBar:SetMinMaxValues(0, maxPower)
         frame.powerBar:SetValue(power)
-		-- frame.powerText:SetText(power .. " / " .. maxPower) -- absolute values
-		local powerPercent = maxPower > 0 and math.floor((power / maxPower) * 100) or 0 -- percentage
-        frame.powerText:SetText(powerPercent .. "%") -- percentage
+
+        -- Status text: always update values; show if CVar on OR mouseover
+        local usePercent = DrakeishUI_StatusTextUsePercent and DrakeishUI_StatusTextUsePercent()
+        local fmt = DrakeishUI_FormatStatusText
+        if fmt then
+            frame.healthText:SetText(fmt(health, maxHealth, usePercent))
+            frame.powerText:SetText(fmt(power, maxPower, usePercent))
+        else
+            frame.healthText:SetText(health .. " / " .. maxHealth)
+            local powerPercent = maxPower > 0 and math.floor((power / maxPower) * 100) or 0
+            frame.powerText:SetText(powerPercent .. "%")
+        end
+        local showText = true
+        if DrakeishUI_StatusTextVisible then
+            showText = DrakeishUI_StatusTextVisible("party", frame.statusTextHover)
+        elseif DrakeishUI_StatusTextIsShown then
+            showText = DrakeishUI_StatusTextIsShown("party") or frame.statusTextHover
+        end
+        if showText then
+            frame.healthText:Show()
+            frame.powerText:Show()
+        else
+            frame.healthText:Hide()
+            frame.powerText:Hide()
+        end
+        
+        -- Set health bar color to class color (10% more vibrant)
+        frame.healthBar:SetStatusBarColor(vibrantR, vibrantG, vibrantB)
 
        local powerType = UnitPowerType(unit)
        local color = PowerBarColor[powerType] or PowerBarColor["MANA"]
@@ -221,7 +358,7 @@ local function CreateCustomPartyFrames()
             frame.portrait:SetSize(40, 40)
             frame.portrait:SetPoint("LEFT", frame, "LEFT", 4, 0)
 
-            -- Name
+            -- Name (truncated in UpdatePartyFrame so it never overlaps level)
             frame.name = frame:CreateFontString(nil, "OVERLAY")
             frame.name:SetFont("Fonts\\FRIZQT__.TTF", 10, "")
             frame.name:SetPoint("TOPLEFT", frame.portrait, "TOPRIGHT", 10, 2)
@@ -229,11 +366,12 @@ local function CreateCustomPartyFrames()
             frame.name:SetTextColor(r, g, b)
 			frame.name:SetShadowColor(0, 0, 0, 0.7)
             frame.name:SetShadowOffset(1, -1)
-			frame.name:SetWidth(70) -- adjust width to taste
+			frame.name:SetWidth(52)
             frame.name:SetWordWrap(false)
+            frame.name:SetNonSpaceWrap(false)
             frame.name:SetJustifyH("LEFT")
 
-            -- Level
+            -- Level (drawn above name so it stays readable if anything overlaps)
             frame.level = frame:CreateFontString(nil, "OVERLAY")
             frame.level:SetFont("Fonts\\FRIZQT__.TTF", 10, "")
             frame.level:SetPoint("RIGHT", frame, "RIGHT", -16, 17)
@@ -242,6 +380,7 @@ local function CreateCustomPartyFrames()
             frame.level:SetTextColor(r, g, b)
 			frame.level:SetShadowColor(0, 0, 0, 0.7)
             frame.level:SetShadowOffset(1, -1)
+            frame.level:SetDrawLayer("OVERLAY", 7)
 
             -- Health bar
             frame.healthBar = CreateFrame("StatusBar", nil, frame)
@@ -296,7 +435,30 @@ local function CreateCustomPartyFrames()
 			
         end
 		
+frame.statusTextHover = false
+
+local function ApplyPartyStatusTextVisibility(self)
+    if not self.healthText or not self.powerText then return end
+    local show = true
+    if DrakeishUI_StatusTextVisible then
+        show = DrakeishUI_StatusTextVisible("party", self.statusTextHover)
+    elseif DrakeishUI_StatusTextIsShown then
+        show = DrakeishUI_StatusTextIsShown("party") or self.statusTextHover
+    else
+        show = self.statusTextHover
+    end
+    if show then
+        self.healthText:Show()
+        self.powerText:Show()
+    else
+        self.healthText:Hide()
+        self.powerText:Hide()
+    end
+end
+
 frame:SetScript("OnEnter", function(self)
+    self.statusTextHover = true
+    ApplyPartyStatusTextVisibility(self)
     local unit = self:GetAttribute("unit")
     if UnitExists(unit) then
         GameTooltip:SetOwner(UIParent, "ANCHOR_NONE") -- Clear mouse anchor
@@ -314,6 +476,8 @@ frame:SetScript("OnEnter", function(self)
 end)
 
 frame:SetScript("OnLeave", function(self)
+    self.statusTextHover = false
+    ApplyPartyStatusTextVisibility(self)
     GameTooltip:Hide()
 end)
 
@@ -367,10 +531,18 @@ end)
 
 
         if i == 1 then
-            -- Check if unitframes are in DragonflightUI position
-            if unitframes_state == 1 then
-                -- Move party frames up when unitframes are above action bars
-                frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 16, -14)
+            -- Check if unitframes are in DragonflightUI position or Diablo orbs are active
+            local orbsActive = (_G.diablo_orbs_state == 1)
+            local petOrbEnabled = _G.D32CharacterData and _G.D32CharacterData.petOrb and _G.D32CharacterData.petOrb.enabled
+            local hidePetFrame = (_G.hide_pet_frame_state or 0) == 1
+            local raidOwnsPet = _G.DrakeishUI_ShouldShowRaidStylePet and _G.DrakeishUI_ShouldShowRaidStylePet()
+            local reservePetSpace = orbsActive and not petOrbEnabled and not hidePetFrame and UnitExists("pet") and not raidOwnsPet
+            if unitframes_state == 1 or orbsActive then
+                local y = -14
+                if reservePetSpace then
+                    y = -14 - 60
+                end
+                frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 16, y)
             else
                 -- Normal position when unitframes are in original positions
                 frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 16, -200)
@@ -581,6 +753,10 @@ do
 		end
 		party_state = checked and 1 or 0
 		-- print("party_state saved as:", party_state) -- Debug line
+		if _G.DrakeishUI_UpdateRaidFrames then
+			_G.DrakeishUI_UpdateRaidFrames()
+		end
+		UpdatePartyToggleButtonPosition()
 	end)
 	
 	-- Add mouseover effects to match other toggle button
@@ -689,4 +865,26 @@ SlashCmdList["PARTYFRAMESCALE"] = function(msg)
         print("Current scale:", partyFrameScale)
     end
 end
+
+-- Refresh party status text when Interface > Status Text CVars change
+if DrakeishUI_RegisterStatusTextListener then
+    DrakeishUI_RegisterStatusTextListener(function()
+        for i = 1, 4 do
+            local frame = customPartyFrames[i]
+            if frame and frame:IsShown() then
+                UpdatePartyFrame(frame, "party"..i)
+            end
+        end
+    end)
+end
+
+function DrakeishUI_RefreshPartyFrames()
+    for i = 1, 4 do
+        local frame = customPartyFrames[i]
+        if frame then
+            UpdatePartyFrame(frame, "party"..i)
+        end
+    end
+end
+_G.DrakeishUI_RefreshPartyFrames = DrakeishUI_RefreshPartyFrames
 

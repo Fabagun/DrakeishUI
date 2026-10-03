@@ -77,12 +77,20 @@ function DF:ShowStartMessage()
 end
 
 function DF:GetClassColor(class, alpha)
-    local r, g, b, hex = GetClassColor(class)
+    local r, g, b = 1, 1, 1
+    if type(GetClassColor) == "function" then
+        r, g, b = GetClassColor(class)
+    elseif class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class] then
+        local c = RAID_CLASS_COLORS[class]
+        r, g, b = c.r, c.g, c.b
+    elseif class and CUSTOM_CLASS_COLORS and CUSTOM_CLASS_COLORS[class] then
+        local c = CUSTOM_CLASS_COLORS[class]
+        r, g, b = c.r, c.g, c.b
+    end
     if alpha then
         return r, g, b, alpha
-    else
-        return r, g, b, 1
     end
+    return r, g, b, 1
 end
 
 -- WoTLK compatibility stubs for missing methods
